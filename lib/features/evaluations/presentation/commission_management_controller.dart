@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/commission_option.dart';
+import '../../../shared/models/commission.dart';
 import '../data/commission_repository.dart';
 import '../data/membre_commission_option.dart';
 
@@ -15,15 +15,16 @@ class CommissionManagementController
   final String appelOffreId;
   final CommissionRepository _repository;
 
-  List<CommissionOption> _commissions = [];
+  List<Commission> _commissions = [];
   List<MembreCommissionOption>
       _membresDisponibles = [];
 
   bool _isLoading = false;
   bool _isSubmitting = false;
   String? _errorMessage;
+  String? _membresErrorMessage;
 
-  List<CommissionOption> get commissions =>
+  List<Commission> get commissions =>
       List.unmodifiable(_commissions);
 
   List<MembreCommissionOption>
@@ -38,8 +39,14 @@ class CommissionManagementController
 
   String? get errorMessage => _errorMessage;
 
+  String? get membresErrorMessage =>
+      _membresErrorMessage;
+
   bool get hasError =>
       _errorMessage != null;
+
+  bool get hasMembresError =>
+      _membresErrorMessage != null;
 
   int get nombreCommissions =>
       _commissions.length;
@@ -57,26 +64,29 @@ class CommissionManagementController
 
     _isLoading = true;
     _errorMessage = null;
+    _membresErrorMessage = null;
     notifyListeners();
 
     try {
-      final commissions =
-          await _repository
-              .listerParAppelOffre(
+      _commissions = await _repository
+          .listerParAppelOffre(
         appelOffreId,
       );
-
-      final membres =
-          await _repository
-              .listerMembresDisponibles();
-
-      _commissions = commissions;
-      _membresDisponibles = membres;
     } on CommissionException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
       _errorMessage =
           'Impossible de charger les commissions.';
+    }
+
+    try {
+      _membresDisponibles = await _repository
+          .listerMembresDisponibles();
+    } on CommissionException catch (error) {
+      _membresErrorMessage = error.message;
+    } catch (_) {
+      _membresErrorMessage =
+          'Impossible de charger les membres disponibles.';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -84,26 +94,29 @@ class CommissionManagementController
   }
 
   Future<void> actualiser() async {
-    try {
-      _errorMessage = null;
+    _errorMessage = null;
+    _membresErrorMessage = null;
 
-      final commissions =
-          await _repository
-              .listerParAppelOffre(
+    try {
+      _commissions = await _repository
+          .listerParAppelOffre(
         appelOffreId,
       );
-
-      final membres =
-          await _repository
-              .listerMembresDisponibles();
-
-      _commissions = commissions;
-      _membresDisponibles = membres;
     } on CommissionException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
       _errorMessage =
           'Impossible d’actualiser les commissions.';
+    }
+
+    try {
+      _membresDisponibles = await _repository
+          .listerMembresDisponibles();
+    } on CommissionException catch (error) {
+      _membresErrorMessage = error.message;
+    } catch (_) {
+      _membresErrorMessage =
+          'Impossible d’actualiser les membres disponibles.';
     } finally {
       notifyListeners();
     }
@@ -209,7 +222,7 @@ class CommissionManagementController
 
   List<MembreCommissionOption>
       membresNonAjoutes(
-    CommissionOption commission,
+    Commission commission,
   ) {
     final identifiantsExistants =
         commission.membres
@@ -231,7 +244,7 @@ class CommissionManagementController
         .toList();
   }
 
-  CommissionOption? trouverCommission(
+  Commission? trouverCommission(
     String commissionId,
   ) {
     for (final commission

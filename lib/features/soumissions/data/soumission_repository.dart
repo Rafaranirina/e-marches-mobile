@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'soumission.dart';
 
 class SoumissionRepository {
@@ -18,28 +19,7 @@ class SoumissionRepository {
         '/api/soumissions/appel-offre/$appelOffreId',
       );
 
-      final data = _convertirReponse(response.data);
-      final liste = data['soumissions'];
-
-      if (liste is! List) {
-        throw const SoumissionException(
-          'La liste des soumissions est invalide.',
-        );
-      }
-
-      return liste
-          .whereType<Map>()
-          .map(
-            (item) => Soumission.fromJson(
-              Map<String, dynamic>.from(item),
-            ),
-          )
-          .where(
-            (soumission) =>
-                soumission.id.isNotEmpty &&
-                soumission.reference.isNotEmpty,
-          )
-          .toList();
+      return _extraireListe(response.data, 'soumissions');
     } on SoumissionException {
       rethrow;
     } on DioException catch (error) {
@@ -56,10 +36,40 @@ class SoumissionRepository {
     }
   }
 
+  /// Soumissions de l'entreprise du fournisseur connecté, brouillons inclus.
+  /// C'est le seul endpoint accessible au rôle fournisseur — la liste par
+  /// appel d'offres (`listerParAppelOffre`) est réservée à
+  /// administration/admin_national/commission côté backend et exclut les
+  /// brouillons.
+  Future<List<Soumission>> listerMesSoumissions() async {
+    try {
+      final response = await _dio.get(
+        '/api/soumissions/mes-soumissions',
+      );
+
+      return _extraireListe(response.data, 'soumissions');
+    } on SoumissionException {
+      rethrow;
+    } on DioException catch (error) {
+      throw SoumissionException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de récupérer vos soumissions.',
+        ),
+      );
+    } catch (_) {
+      throw const SoumissionException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  /// Dépose une soumission en brouillon. Le backend génère lui-même la
+  /// référence (format `SOU-annee-hex`) et déduit l'entreprise du
+  /// fournisseur authentifié : il ne faut envoyer ni `reference` ni
+  /// `entreprise_id`.
   Future<SoumissionActionResult> deposer({
-    required String reference,
     required String appelOffreId,
-    required String entrepriseId,
     required double montantPropose,
     String? delaiExecution,
   }) async {
@@ -67,9 +77,7 @@ class SoumissionRepository {
       final response = await _dio.post(
         '/api/soumissions',
         data: {
-          'reference': reference.trim(),
           'appel_offre_id': appelOffreId.trim(),
-          'entreprise_id': entrepriseId.trim(),
           'montant_propose': montantPropose,
           'delai_execution':
               _nullableString(delaiExecution),
@@ -84,6 +92,88 @@ class SoumissionRepository {
         _extraireMessageErreur(
           error,
           'Impossible de déposer la soumission.',
+        ),
+      );
+    } catch (_) {
+      throw const SoumissionException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  /// Modifie une soumission tant qu'elle est encore en brouillon.
+  Future<SoumissionActionResult> modifierBrouillon({
+    required String soumissionId,
+    double? montantPropose,
+    String? delaiExecution,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '/api/soumissions/$soumissionId/brouillon',
+        data: {
+          'montant_propose': montantPropose,
+          'delai_execution':
+              _nullableString(delaiExecution),
+        }..removeWhere((_, value) => value == null),
+      );
+
+      return _convertirResultatAction(response.data);
+    } on SoumissionException {
+      rethrow;
+    } on DioException catch (error) {
+      throw SoumissionException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de modifier la soumission.',
+        ),
+      );
+    } catch (_) {
+      throw const SoumissionException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  /// Transmet définitivement la soumission (brouillon -> soumise). Nécessite
+  /// qu'au moins un document soit déjà attaché, sinon le backend refuse
+  /// (400). Retourne le récépissé (référence, horodatage, empreinte).
+  Future<TransmissionResult> transmettre({
+    required String soumissionId,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '/api/soumissions/$soumissionId/transmettre',
+      );
+
+      final data = _convertirReponse(response.data);
+      final soumissionJson = data['soumission'];
+      final recepisseJson = data['recepisse'];
+
+      if (recepisseJson is! Map) {
+        throw const SoumissionException(
+          'Le récépissé de transmission est manquant dans la réponse du serveur.',
+        );
+      }
+
+      return TransmissionResult(
+        message: data['message']?.toString() ??
+            'Soumission transmise avec succès.',
+        recepisse: RecepisseTransmission.fromJson(
+          Map<String, dynamic>.from(recepisseJson),
+        ),
+        soumission: soumissionJson is Map
+            ? Soumission.fromJson(
+                Map<String, dynamic>.from(soumissionJson),
+              )
+            : null,
+      );
+    } on SoumissionException {
+      rethrow;
+    } on DioException catch (error) {
+      throw SoumissionException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de transmettre la soumission.',
         ),
       );
     } catch (_) {
@@ -132,6 +222,32 @@ class SoumissionRepository {
     }
   }
 
+  List<Soumission> _extraireListe(
+    dynamic responseData,
+    String cle,
+  ) {
+    final data = _convertirReponse(responseData);
+    final liste = data[cle];
+
+    if (liste is! List) {
+      throw const SoumissionException(
+        'La liste des soumissions est invalide.',
+      );
+    }
+
+    return liste
+        .whereType<Map>()
+        .map(
+          (item) => Soumission.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
+        .where(
+          (soumission) => soumission.id.isNotEmpty,
+        )
+        .toList();
+  }
+
   SoumissionActionResult _convertirResultatAction(
     dynamic responseData,
   ) {
@@ -167,48 +283,14 @@ class SoumissionRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData = error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']?.toString().trim();
-
-      if (message != null && message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    if (error.response?.statusCode == 401) {
-      return 'Votre session a expiré. Reconnectez-vous.';
-    }
-
-    if (error.response?.statusCode == 403) {
-      return 'Vous n’êtes pas autorisé à effectuer cette action.';
-    }
-
-    if (error.response?.statusCode == 404) {
-      return 'La soumission ou l’appel d’offres est introuvable.';
-    }
-
-    if (error.response?.statusCode == 409) {
-      return 'Cette entreprise a déjà déposé une soumission.';
-    }
-
-    return messageParDefaut;
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        404: 'La soumission ou l’appel d’offres est introuvable.',
+        409: 'Cette entreprise a déjà déposé une soumission.',
+      },
+    );
   }
 
   static String? _nullableString(
@@ -227,6 +309,18 @@ class SoumissionActionResult {
   });
 
   final String message;
+  final Soumission? soumission;
+}
+
+class TransmissionResult {
+  const TransmissionResult({
+    required this.message,
+    required this.recepisse,
+    this.soumission,
+  });
+
+  final String message;
+  final RecepisseTransmission recepisse;
   final Soumission? soumission;
 }
 

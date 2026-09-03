@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
-import 'commission_option.dart';
+import '../../../shared/models/commission.dart';
 import 'membre_commission_option.dart';
 
 class CommissionRepository {
@@ -11,7 +11,7 @@ class CommissionRepository {
 
   final Dio _dio;
 
-  Future<List<CommissionOption>> listerParAppelOffre(
+  Future<List<Commission>> listerParAppelOffre(
     String appelOffreId,
   ) async {
     if (appelOffreId.trim().isEmpty) {
@@ -40,7 +40,7 @@ class CommissionRepository {
       return liste
           .whereType<Map>()
           .map(
-            (item) => CommissionOption.fromJson(
+            (item) => Commission.fromJson(
               Map<String, dynamic>.from(item),
             ),
           )
@@ -103,11 +103,11 @@ class CommissionRepository {
       final commissionData =
           data['commission'];
 
-      CommissionOption? commission;
+      Commission? commission;
 
       if (commissionData is Map) {
         commission =
-            CommissionOption.fromJson(
+            Commission.fromJson(
           Map<String, dynamic>.from(
             commissionData,
           ),
@@ -137,54 +137,19 @@ class CommissionRepository {
     }
   }
 
+  // TODO(backend): aucune route backend n'expose la liste des utilisateurs
+  // éligibles à une commission (l'ancienne cible '/api/users/membres-commission'
+  // n'existe pas dans user.routes.js, confirmé par grep exhaustif ; le seul
+  // endpoint listant des utilisateurs, GET /api/users, est réservé à
+  // admin_national alors que la création de commission est aussi permise à
+  // administration). On lève immédiatement une erreur explicite plutôt que
+  // d'appeler un endpoint inexistant (404 silencieux) — voir audit du 2026-09-03.
   Future<List<MembreCommissionOption>>
       listerMembresDisponibles() async {
-    try {
-      final response = await _dio.get(
-        '/api/users/membres-commission',
-      );
-
-      final data = _convertirReponse(
-        response.data,
-      );
-
-      final liste = data['utilisateurs'];
-
-      if (liste is! List) {
-        throw const CommissionException(
-          'La liste des membres disponibles est invalide.',
-        );
-      }
-
-      return liste
-          .whereType<Map>()
-          .map(
-            (item) =>
-                MembreCommissionOption.fromJson(
-              Map<String, dynamic>.from(item),
-            ),
-          )
-          .where(
-            (membre) =>
-                membre.id.isNotEmpty &&
-                membre.nom.isNotEmpty &&
-                membre.email.isNotEmpty,
-          )
-          .toList();
-    } on CommissionException {
-      rethrow;
-    } on DioException catch (error) {
-      throw CommissionException(
-        _extraireMessageErreur(
-          error,
-          'Impossible de récupérer les membres disponibles.',
-        ),
-      );
-    } catch (_) {
-      throw const CommissionException(
-        'Une erreur inattendue est survenue.',
-      );
-    }
+    throw const CommissionException(
+      'Fonctionnalité indisponible : aucun endpoint backend ne permet '
+      'actuellement de lister les membres éligibles à une commission.',
+    );
   }
 
   Future<AjoutMembreCommissionResult>
@@ -352,7 +317,7 @@ class CreationCommissionResult {
   });
 
   final String message;
-  final CommissionOption? commission;
+  final Commission? commission;
 }
 
 class AjoutMembreCommissionResult {

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
-import 'commission_marche.dart';
+import '../../../shared/models/commission.dart';
 
 class CommissionRepository {
   CommissionRepository({
@@ -83,11 +83,11 @@ class CommissionRepository {
       final commissionData =
           data['commission'];
 
-      CommissionMarche? commission;
+      Commission? commission;
 
       if (commissionData is Map) {
         commission =
-            CommissionMarche.fromJson(
+            Commission.fromJson(
           Map<String, dynamic>.from(
             commissionData,
           ),
@@ -275,7 +275,7 @@ class ActionCommissionResult {
   });
 
   final String message;
-  final CommissionMarche? commission;
+  final Commission? commission;
 }
 
 class ActionMembreCommissionResult {

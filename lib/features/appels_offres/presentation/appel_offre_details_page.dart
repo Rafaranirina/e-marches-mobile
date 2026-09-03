@@ -10,6 +10,7 @@ import '../../soumissions/presentation/soumission_form_page.dart';
 import '../../soumissions/presentation/soumissions_page.dart';
 import '../data/appel_offre.dart';
 import '../data/appel_offre_repository.dart';
+import '../data/appel_offre_transitions.dart';
 import 'appel_offre_form_page.dart';
 
 class AppelOffreDetailsPage extends StatefulWidget {
@@ -280,6 +281,158 @@ class _AppelOffreDetailsPageState
     }
   }
 
+  Future<void> _changerStatut(
+    String statutCible,
+  ) async {
+    if (_isBusy) {
+      return;
+    }
+
+    final motifObligatoire =
+        AppelOffreTransitions.motifObligatoire(
+      statutCible,
+    );
+
+    final motifController =
+        TextEditingController();
+
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                '${AppelOffreTransitions.libelleAction(statutCible)} l’appel d’offres',
+              ),
+              content: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize:
+                      MainAxisSize.min,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      motifObligatoire
+                          ? 'Cette action est définitive. Merci d’indiquer le motif.'
+                          : 'Confirmez-vous cette action ?',
+                    ),
+                    if (motifObligatoire) ...[
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller:
+                            motifController,
+                        maxLines: 3,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Motif *',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {
+                          setDialogState(() {});
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop(false);
+                  },
+                  child: const Text(
+                    'Annuler',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: motifObligatoire &&
+                          motifController.text
+                              .trim()
+                              .isEmpty
+                      ? null
+                      : () {
+                          Navigator.of(
+                            dialogContext,
+                          ).pop(true);
+                        },
+                  child: Text(
+                    AppelOffreTransitions
+                        .libelleAction(
+                      statutCible,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmation != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isBusy = true;
+    });
+
+    try {
+      final resultat =
+          await _repository.changerStatut(
+        id: _appelOffre.id,
+        statut: statutCible,
+        motif: motifController.text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (resultat.appelOffre != null) {
+        setState(() {
+          _appelOffre = resultat.appelOffre!;
+        });
+      } else {
+        await _actualiser();
+      }
+
+      _afficherMessage(
+        resultat.message,
+      );
+    } on AppelOffreException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _afficherMessage(
+        error.message,
+        estErreur: true,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _afficherMessage(
+        'Impossible de changer le statut de l’appel d’offres.',
+        estErreur: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBusy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _ouvrirSoumissions() async {
     if (_isBusy) {
       return;
@@ -337,9 +490,7 @@ class _AppelOffreDetailsPageState
     await _actualiser();
   }
 
-  Future<void> _deposerSoumission(
-    String entrepriseId,
-  ) async {
+  Future<void> _deposerSoumission() async {
     if (_isBusy) {
       return;
     }
@@ -355,8 +506,6 @@ class _AppelOffreDetailsPageState
               _appelOffre.id,
           appelOffreReference:
               _appelOffre.reference,
-          entrepriseId:
-              entrepriseId,
         ),
       ),
     );
@@ -366,7 +515,7 @@ class _AppelOffreDetailsPageState
     }
 
     _afficherMessage(
-      resultat.message,
+      '${resultat.message} Retrouvez-la dans « Mes soumissions » depuis le tableau de bord pour ajouter vos documents et la transmettre.',
     );
   }
 
@@ -442,6 +591,17 @@ class _AppelOffreDetailsPageState
     final peutModifier =
         peutAdministrer &&
             estBrouillon;
+
+    final transitionsDisponibles =
+        AppelOffreTransitions
+            .transitionsDisponibles(
+      _appelOffre.statut,
+    );
+
+    final peutChangerStatut =
+        peutAdministrer &&
+            !estBrouillon &&
+            transitionsDisponibles.isNotEmpty;
 
     final dateLimite =
         _appelOffre
@@ -812,7 +972,9 @@ class _AppelOffreDetailsPageState
                 ),
               ],
               if (peutAdministrer &&
-                  !estBrouillon) ...[
+                  !estBrouillon &&
+                  transitionsDisponibles
+                      .isEmpty) ...[
                 const SizedBox(
                   height: 12,
                 ),
@@ -834,7 +996,7 @@ class _AppelOffreDetailsPageState
                         ),
                         Expanded(
                           child: Text(
-                            'Cet appel d’offres n’est plus un brouillon. La modification et la publication ne sont plus disponibles.',
+                            'Cet appel d’offres est dans un statut définitif : aucune action supplémentaire n’est disponible.',
                             style: Theme.of(
                               context,
                             )
@@ -972,7 +1134,7 @@ class _AppelOffreDetailsPageState
                 ),
               ),
             )
-          : peutSoumettre
+          : peutChangerStatut
               ? SafeArea(
                   child: Material(
                     elevation: 12,
@@ -980,27 +1142,67 @@ class _AppelOffreDetailsPageState
                       padding:
                           const EdgeInsets
                               .all(16),
-                      child:
-                          FilledButton.icon(
-                        onPressed: _isBusy
-                            ? null
-                            : () {
-                                _deposerSoumission(
-                                  entrepriseId,
-                                );
-                              },
-                        icon: const Icon(
-                          Icons
-                              .send_outlined,
-                        ),
-                        label: const Text(
-                          'Déposer une soumission',
-                        ),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        alignment:
+                            WrapAlignment
+                                .end,
+                        children: [
+                          for (final statutCible
+                              in transitionsDisponibles)
+                            OutlinedButton.icon(
+                              onPressed: _isBusy
+                                  ? null
+                                  : () =>
+                                      _changerStatut(
+                                        statutCible,
+                                      ),
+                              icon: Icon(
+                                statutCible ==
+                                        'annule'
+                                    ? Icons
+                                        .cancel_outlined
+                                    : Icons
+                                        .arrow_forward,
+                              ),
+                              label: Text(
+                                AppelOffreTransitions
+                                    .libelleAction(
+                                  statutCible,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 )
-              : null,
+              : peutSoumettre
+                  ? SafeArea(
+                      child: Material(
+                        elevation: 12,
+                        child: Padding(
+                          padding:
+                              const EdgeInsets
+                                  .all(16),
+                          child:
+                              FilledButton.icon(
+                            onPressed: _isBusy
+                                ? null
+                                : _deposerSoumission,
+                            icon: const Icon(
+                              Icons
+                                  .send_outlined,
+                            ),
+                            label: const Text(
+                              'Déposer une soumission',
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
     );
   }
 
@@ -1240,6 +1442,16 @@ class _StatutChip
             Icons.event_busy_outlined;
         break;
 
+      case 'en_evaluation':
+        texte = 'En évaluation';
+        fond =
+            couleur.tertiaryContainer;
+        premierPlan =
+            couleur.onTertiaryContainer;
+        icone =
+            Icons.leaderboard_outlined;
+        break;
+
       case 'attribue':
         texte = 'Attribué';
         fond =
@@ -1248,6 +1460,16 @@ class _StatutChip
             couleur.onPrimaryContainer;
         icone =
             Icons.verified_outlined;
+        break;
+
+      case 'infructueux':
+        texte = 'Infructueux';
+        fond =
+            couleur.errorContainer;
+        premierPlan =
+            couleur.onErrorContainer;
+        icone =
+            Icons.block_outlined;
         break;
 
       case 'annule':

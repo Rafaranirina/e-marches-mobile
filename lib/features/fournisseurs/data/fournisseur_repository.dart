@@ -64,6 +64,37 @@ class FournisseurRepository {
     }
   }
 
+  /// Valide une entreprise en attente (`statut_validation: 'en_attente'`).
+  /// Réservé au rôle `admin_national` côté backend
+  /// (`entreprise.routes.js`).
+  Future<String> validerEntreprise({
+    required String entrepriseId,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '/api/entreprises/${entrepriseId.trim()}/statut',
+        data: {'statut': 'actif'},
+      );
+
+      final responseData = response.data;
+
+      return responseData is Map && responseData['message'] != null
+          ? responseData['message'].toString()
+          : 'Entreprise validée avec succès.';
+    } on DioException catch (error) {
+      throw FournisseurException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de valider cette entreprise.',
+        ),
+      );
+    } catch (_) {
+      throw const FournisseurException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
   String _extraireMessageErreur(
     DioException error,
     String messageParDefaut,

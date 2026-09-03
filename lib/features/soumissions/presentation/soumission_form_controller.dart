@@ -19,18 +19,14 @@ class SoumissionFormController extends ChangeNotifier {
   bool get hasError => _errorMessage != null;
 
   Future<SoumissionActionResult?> deposer({
-    required String reference,
     required String appelOffreId,
-    required String entrepriseId,
     required double? montantPropose,
     String? delaiExecution,
   }) async {
     _errorMessage = null;
 
     final erreurValidation = _valider(
-      reference: reference,
       appelOffreId: appelOffreId,
-      entrepriseId: entrepriseId,
       montantPropose: montantPropose,
     );
 
@@ -45,9 +41,7 @@ class SoumissionFormController extends ChangeNotifier {
 
     try {
       return await _repository.deposer(
-        reference: reference,
         appelOffreId: appelOffreId,
-        entrepriseId: entrepriseId,
         montantPropose: montantPropose!,
         delaiExecution: delaiExecution,
       );
@@ -65,21 +59,11 @@ class SoumissionFormController extends ChangeNotifier {
   }
 
   String? _valider({
-    required String reference,
     required String appelOffreId,
-    required String entrepriseId,
     required double? montantPropose,
   }) {
-    if (reference.trim().isEmpty) {
-      return 'La référence de la soumission est obligatoire.';
-    }
-
     if (appelOffreId.trim().isEmpty) {
       return 'L’appel d’offres est invalide.';
-    }
-
-    if (entrepriseId.trim().isEmpty) {
-      return 'Aucune entreprise n’est associée à ce compte fournisseur.';
     }
 
     if (montantPropose == null) {

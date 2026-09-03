@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../data/commission_option.dart';
+import '../../../shared/models/commission.dart';
 import '../data/membre_commission_option.dart';
 import 'commission_management_controller.dart';
 
@@ -78,10 +78,20 @@ class _CommissionManagementView
 
   Future<void> _ajouterMembre(
     BuildContext context,
-    CommissionOption commission,
+    Commission commission,
   ) async {
     final controller = context
         .read<CommissionManagementController>();
+
+    if (controller.hasMembresError) {
+      _afficherMessage(
+        context,
+        controller.membresErrorMessage ??
+            'Impossible de charger les membres.',
+        estErreur: true,
+      );
+      return;
+    }
 
     final membresDisponibles =
         controller.membresNonAjoutes(
@@ -402,7 +412,7 @@ class _CommissionCard extends StatelessWidget {
     required this.onAjouterMembre,
   });
 
-  final CommissionOption commission;
+  final Commission commission;
   final Map<String, MembreCommissionOption>
       membresParId;
   final bool isSubmitting;
@@ -673,7 +683,7 @@ class _AjoutMembreDialog
     required this.membresDisponibles,
   });
 
-  final CommissionOption commission;
+  final Commission commission;
   final List<MembreCommissionOption>
       membresDisponibles;
 

@@ -5,6 +5,7 @@ class AuthUser {
     required this.prenom,
     required this.email,
     required this.role,
+    this.statut,
     this.administrationId,
     this.entrepriseId,
   });
@@ -14,6 +15,7 @@ class AuthUser {
   final String prenom;
   final String email;
   final String role;
+  final String? statut;
 
   final String? administrationId;
   final String? entrepriseId;
@@ -45,6 +47,7 @@ class AuthUser {
       prenom: json['prenom']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       role: json['role']?.toString() ?? '',
+      statut: _nullableString(json['statut']),
       administrationId: _nullableString(
         json['administration_id'],
       ),
@@ -61,6 +64,7 @@ class AuthUser {
       'prenom': prenom,
       'email': email,
       'role': role,
+      'statut': statut,
       'administration_id': administrationId,
       'entreprise_id': entrepriseId,
     };

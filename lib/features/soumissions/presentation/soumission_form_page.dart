@@ -8,13 +8,11 @@ class SoumissionFormPage extends StatelessWidget {
   const SoumissionFormPage({
     required this.appelOffreId,
     required this.appelOffreReference,
-    required this.entrepriseId,
     super.key,
   });
 
   final String appelOffreId;
   final String appelOffreReference;
-  final String entrepriseId;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +21,6 @@ class SoumissionFormPage extends StatelessWidget {
       child: _SoumissionFormView(
         appelOffreId: appelOffreId,
         appelOffreReference: appelOffreReference,
-        entrepriseId: entrepriseId,
       ),
     );
   }
@@ -33,12 +30,10 @@ class _SoumissionFormView extends StatefulWidget {
   const _SoumissionFormView({
     required this.appelOffreId,
     required this.appelOffreReference,
-    required this.entrepriseId,
   });
 
   final String appelOffreId;
   final String appelOffreReference;
-  final String entrepriseId;
 
   @override
   State<_SoumissionFormView> createState() =>
@@ -50,9 +45,6 @@ class _SoumissionFormViewState
   final GlobalKey<FormState> _formKey =
       GlobalKey<FormState>();
 
-  final TextEditingController _referenceController =
-      TextEditingController();
-
   final TextEditingController _montantController =
       TextEditingController();
 
@@ -61,7 +53,6 @@ class _SoumissionFormViewState
 
   @override
   void dispose() {
-    _referenceController.dispose();
     _montantController.dispose();
     _delaiController.dispose();
     super.dispose();
@@ -78,9 +69,7 @@ class _SoumissionFormViewState
         context.read<SoumissionFormController>();
 
     final resultat = await controller.deposer(
-      reference: _referenceController.text,
       appelOffreId: widget.appelOffreId,
-      entrepriseId: widget.entrepriseId,
       montantPropose: _parseMontant(
         _montantController.text,
       ),
@@ -209,33 +198,6 @@ class _SoumissionFormViewState
                         const Divider(height: 28),
                         TextFormField(
                           controller:
-                              _referenceController,
-                          textCapitalization:
-                              TextCapitalization.characters,
-                          textInputAction:
-                              TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText:
-                                'Référence de la soumission *',
-                            hintText:
-                                'Exemple : SOUM-2026-001',
-                            prefixIcon: Icon(
-                              Icons.numbers_outlined,
-                            ),
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null ||
-                                value.trim().isEmpty) {
-                              return 'La référence est obligatoire.';
-                            }
-
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller:
                               _montantController,
                           keyboardType:
                               const TextInputType
@@ -312,7 +274,7 @@ class _SoumissionFormViewState
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
-                            'Après le dépôt, la soumission sera enregistrée avec le statut « Soumise ». Une entreprise ne peut déposer qu’une seule soumission pour le même appel d’offres.',
+                            'Après le dépôt, la soumission sera enregistrée avec le statut « Brouillon » (la référence sera générée automatiquement). Ajoutez au moins un document depuis « Mes soumissions » puis transmettez-la pour la rendre définitive. Une entreprise ne peut déposer qu’une seule soumission pour le même appel d’offres.',
                           ),
                         ),
                       ],

@@ -8,8 +8,10 @@ import '../../categories/presentation/categories_page.dart';
 import '../../contrats/presentation/contrats_page.dart';
 import '../../fournisseurs/presentation/fournisseurs_page.dart';
 import '../../notifications/presentation/notifications_page.dart';
+import '../../parametres/presentation/parametres_page.dart';
 import '../../profil/presentation/profil_page.dart';
 import '../../rapports/presentation/rapports_page.dart';
+import '../../soumissions/presentation/mes_soumissions_page.dart';
 import '../../utilisateurs/presentation/utilisateurs_page.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -32,6 +34,8 @@ class DashboardPage extends StatelessWidget {
 
     final estAdministrateurNational =
         role == 'admin_national';
+
+    final estFournisseur = role == 'fournisseur';
 
     final peutVoirFournisseurs =
         estAdministrateurNational ||
@@ -302,14 +306,18 @@ class DashboardPage extends StatelessWidget {
                   _ModuleCard(
                     icon: Icons
                         .assignment_turned_in_outlined,
-                    titre: 'Soumissions',
-                    description:
-                        'Les soumissions sont accessibles depuis chaque appel d’offres',
+                    titre: estFournisseur
+                        ? 'Mes soumissions'
+                        : 'Soumissions',
+                    description: estFournisseur
+                        ? 'Déposer, modifier et transmettre vos soumissions'
+                        : 'Les soumissions sont accessibles depuis chaque appel d’offres',
                     onTap: () {
                       Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              const AppelsOffresPage(),
+                          builder: (_) => estFournisseur
+                              ? const MesSoumissionsPage()
+                              : const AppelsOffresPage(),
                         ),
                       );
                     },
@@ -356,6 +364,23 @@ class DashboardPage extends StatelessWidget {
                       },
                     ),
                   ],
+
+                  const SizedBox(height: 8),
+
+                  _ModuleCard(
+                    icon: Icons.settings_outlined,
+                    titre: 'Paramètres',
+                    description:
+                        'Modifier mes informations, ma photo et la double authentification',
+                    onTap: () {
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              const ParametresPage(),
+                        ),
+                      );
+                    },
+                  ),
 
                   const SizedBox(height: 24),
                 ],

@@ -586,6 +586,14 @@ class _StatutSoumissionChip
     final IconData icone;
 
     switch (statutNormalise) {
+      case 'brouillon':
+        libelle = 'Brouillon';
+        fond = couleurs.surfaceContainerHighest;
+        premierPlan =
+            couleurs.onSurfaceVariant;
+        icone = Icons.edit_note_outlined;
+        break;
+
       case 'recevable':
         libelle = 'Recevable';
         fond = couleurs.primaryContainer;
@@ -608,6 +616,30 @@ class _StatutSoumissionChip
         premierPlan =
             couleurs.onSecondaryContainer;
         icone = Icons.schedule_outlined;
+        break;
+
+      case 'evaluee':
+        libelle = 'Évaluée';
+        fond = couleurs.secondaryContainer;
+        premierPlan =
+            couleurs.onSecondaryContainer;
+        icone = Icons.fact_check_outlined;
+        break;
+
+      case 'retenue':
+        libelle = 'Retenue';
+        fond = couleurs.primaryContainer;
+        premierPlan =
+            couleurs.onPrimaryContainer;
+        icone = Icons.emoji_events_outlined;
+        break;
+
+      case 'rejetee':
+        libelle = 'Rejetée';
+        fond = couleurs.errorContainer;
+        premierPlan =
+            couleurs.onErrorContainer;
+        icone = Icons.block_outlined;
         break;
 
       default:

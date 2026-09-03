@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'appel_offre.dart';
 import 'appel_offre_referentiels.dart';
 
@@ -256,6 +257,34 @@ class AppelOffreRepository {
     }
   }
 
+  /// Transitions génériques (clôturer, passer en évaluation, déclarer
+  /// infructueux, annuler). `motif` est obligatoire côté backend pour
+  /// `annule`/`infructueux` — voir `AppelOffreTransitions.motifObligatoire`.
+  Future<AppelOffreActionResult> changerStatut({
+    required String id,
+    required String statut,
+    String? motif,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '/api/appels-offres/$id/statut',
+        data: {
+          'statut': statut.trim(),
+          if (_isNotEmpty(motif)) 'motif': motif!.trim(),
+        },
+      );
+
+      return _parseActionResult(response.data);
+    } on DioException catch (error) {
+      throw AppelOffreException(
+        _extractErrorMessage(
+          error,
+          'Impossible de changer le statut de l’appel d’offres.',
+        ),
+      );
+    }
+  }
+
   Map<String, dynamic> _buildPayload({
     required String reference,
     required String titre,
@@ -311,27 +340,7 @@ class AppelOffreRepository {
     DioException error,
     String defaultMessage,
   ) {
-    final responseData = error.response?.data;
-
-    if (responseData is Map) {
-      final message = responseData['message']?.toString().trim();
-
-      if (message != null && message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.receiveTimeout ||
-        error.type == DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type == DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    return defaultMessage;
+    return extraireMessageErreur(error, defaultMessage);
   }
 
   static bool _isNotEmpty(String? value) {

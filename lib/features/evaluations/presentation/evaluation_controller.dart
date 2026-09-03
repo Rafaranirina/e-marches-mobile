@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/classement_soumission.dart';
-import '../data/commission_option.dart';
+import '../../../shared/models/commission.dart';
 import '../data/commission_repository.dart';
 import '../data/evaluation_repository.dart';
 
@@ -20,7 +20,7 @@ class EvaluationController extends ChangeNotifier {
   final CommissionRepository _commissionRepository;
 
   List<ClassementSoumission> _classement = [];
-  List<CommissionOption> _commissions = [];
+  List<Commission> _commissions = [];
 
   bool _isLoading = false;
   bool _isSubmitting = false;
@@ -29,7 +29,7 @@ class EvaluationController extends ChangeNotifier {
   List<ClassementSoumission> get classement =>
       List.unmodifiable(_classement);
 
-  List<CommissionOption> get commissions =>
+  List<Commission> get commissions =>
       List.unmodifiable(_commissions);
 
   bool get isLoading => _isLoading;
@@ -68,7 +68,7 @@ class EvaluationController extends ChangeNotifier {
           resultats[0] as List<ClassementSoumission>;
 
       _commissions =
-          resultats[1] as List<CommissionOption>;
+          resultats[1] as List<Commission>;
     } on EvaluationException catch (error) {
       _errorMessage = error.message;
     } on CommissionException catch (error) {
@@ -99,7 +99,7 @@ class EvaluationController extends ChangeNotifier {
           resultats[0] as List<ClassementSoumission>;
 
       _commissions =
-          resultats[1] as List<CommissionOption>;
+          resultats[1] as List<Commission>;
     } on EvaluationException catch (error) {
       _errorMessage = error.message;
     } on CommissionException catch (error) {

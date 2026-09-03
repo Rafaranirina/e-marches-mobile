@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../auth/presentation/auth_controller.dart';
 import '../data/fournisseur.dart';
 import 'fournisseur_controller.dart';
 
@@ -48,6 +49,12 @@ class _FournisseursViewState
     final controller =
         context.watch<FournisseurController>();
 
+    final estAdminNational = context
+            .watch<AuthController>()
+            .utilisateur
+            ?.estAdministrateurNational ??
+        false;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fournisseurs'),
@@ -68,7 +75,10 @@ class _FournisseursViewState
           children: [
             _buildEntete(controller),
             Expanded(
-              child: _buildContenu(controller),
+              child: _buildContenu(
+                controller,
+                estAdminNational,
+              ),
             ),
           ],
         ),
@@ -165,6 +175,7 @@ class _FournisseursViewState
 
   Widget _buildContenu(
     FournisseurController controller,
+    bool estAdminNational,
   ) {
     if (controller.isLoading) {
       return const Center(
@@ -207,8 +218,68 @@ class _FournisseursViewState
         separatorBuilder: (_, _) =>
             const SizedBox(height: 12),
         itemBuilder: (context, index) {
+          final fournisseur = fournisseurs[index];
+
           return _FournisseurCard(
-            fournisseur: fournisseurs[index],
+            fournisseur: fournisseur,
+            peutValider: estAdminNational,
+            validationEnCours:
+                controller.validationEnCours(fournisseur.id),
+            onValider: () async {
+              final confirmation = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) {
+                  return AlertDialog(
+                    title: const Text('Valider l’entreprise'),
+                    content: Text(
+                      'Confirmez-vous la validation de « ${fournisseur.raisonSociale} » ? '
+                      'Les comptes fournisseurs en attente liés à cette entreprise seront également activés.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(false),
+                        child: const Text('Annuler'),
+                      ),
+                      FilledButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(true),
+                        child: const Text('Valider'),
+                      ),
+                    ],
+                  );
+                },
+              );
+
+              if (confirmation != true || !context.mounted) {
+                return;
+              }
+
+              final message = await controller.validerEntreprise(
+                fournisseur.id,
+              );
+
+              if (!context.mounted) {
+                return;
+              }
+
+              final messenger = ScaffoldMessenger.of(context);
+
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    backgroundColor: message == null
+                        ? Theme.of(context).colorScheme.error
+                        : null,
+                    content: Text(
+                      message ??
+                          controller.errorMessage ??
+                          'Impossible de valider cette entreprise.',
+                    ),
+                  ),
+                );
+            },
           );
         },
       ),
@@ -219,12 +290,22 @@ class _FournisseursViewState
 class _FournisseurCard extends StatelessWidget {
   const _FournisseurCard({
     required this.fournisseur,
+    required this.peutValider,
+    required this.validationEnCours,
+    required this.onValider,
   });
 
   final Fournisseur fournisseur;
+  final bool peutValider;
+  final bool validationEnCours;
+  final VoidCallback onValider;
 
   @override
   Widget build(BuildContext context) {
+    final estEnAttente =
+        fournisseur.statutValidation?.trim().toLowerCase() ==
+            'en_attente';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -283,6 +364,28 @@ class _FournisseurCard extends StatelessWidget {
                 fournisseur.dateCreation,
               ),
             ),
+            if (peutValider && estEnAttente) ...[
+              const Divider(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: validationEnCours
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : FilledButton.icon(
+                        onPressed: onValider,
+                        icon: const Icon(
+                          Icons.verified_outlined,
+                        ),
+                        label: const Text(
+                          'Valider l’entreprise',
+                        ),
+                      ),
+              ),
+            ],
           ],
         ),
       ),
@@ -391,22 +494,27 @@ class _StatutValidationChip
     final IconData icone;
 
     switch (statutNormalise) {
-      case 'valide':
-      case 'validee':
-      case 'validé':
-      case 'validée':
-        libelle = 'Validé';
+      // Valeurs réelles confirmées côté backend (type Postgres
+      // `statut_compte`, identique à `utilisateurs.statut`) :
+      // en_attente / actif / inactif / suspendu.
+      case 'actif':
+        libelle = 'Actif';
         fond = couleurs.primaryContainer;
         premierPlan =
             couleurs.onPrimaryContainer;
         icone = Icons.verified_outlined;
         break;
 
-      case 'rejete':
-      case 'rejetee':
-      case 'rejeté':
-      case 'rejetée':
-        libelle = 'Rejeté';
+      case 'suspendu':
+        libelle = 'Suspendu';
+        fond = couleurs.errorContainer;
+        premierPlan =
+            couleurs.onErrorContainer;
+        icone = Icons.pause_circle_outline;
+        break;
+
+      case 'inactif':
+        libelle = 'Inactif';
         fond = couleurs.errorContainer;
         premierPlan =
             couleurs.onErrorContainer;
@@ -414,8 +522,6 @@ class _StatutValidationChip
         break;
 
       case 'en_attente':
-      case 'en attente':
-      case 'attente':
         libelle = 'En attente';
         fond = couleurs.secondaryContainer;
         premierPlan =

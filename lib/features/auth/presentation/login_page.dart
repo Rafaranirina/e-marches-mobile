@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../dashboard/presentation/dashboard_page.dart';
 import 'auth_controller.dart';
+import 'mot_de_passe_oublie_page.dart';
+import 'verification_2fa_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -48,12 +50,17 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final message = result.requiresTwoFactor
-        ? 'La double authentification est requise pour ce compte.'
-        : result.message;
+    if (result.requiresTwoFactor) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const Verification2FAPage(),
+        ),
+      );
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(content: Text(result.message)),
     );
   }
 
@@ -153,7 +160,22 @@ class _LoginPageState extends State<LoginPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const MotDePasseOubliePage(),
+                            ),
+                          );
+                        },
+                        child: const Text('Mot de passe oublié ?'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed:
                           authController.isLoading ? null : _submit,

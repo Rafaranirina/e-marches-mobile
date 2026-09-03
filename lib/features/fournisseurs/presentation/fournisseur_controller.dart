@@ -11,6 +11,7 @@ class FournisseurController extends ChangeNotifier {
   final FournisseurRepository _repository;
 
   List<Fournisseur> _fournisseurs = [];
+  final Set<String> _validationsEnCours = {};
   String _recherche = '';
   bool _isLoading = false;
   String? _errorMessage;
@@ -93,5 +94,50 @@ class FournisseurController extends ChangeNotifier {
   void effacerRecherche() {
     _recherche = '';
     notifyListeners();
+  }
+
+  bool validationEnCours(String entrepriseId) {
+    return _validationsEnCours.contains(entrepriseId);
+  }
+
+  Future<String?> validerEntreprise(String entrepriseId) async {
+    if (_validationsEnCours.contains(entrepriseId)) {
+      return null;
+    }
+
+    _validationsEnCours.add(entrepriseId);
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final message =
+          await _repository.validerEntreprise(entrepriseId: entrepriseId);
+
+      final index = _fournisseurs.indexWhere(
+        (fournisseur) => fournisseur.id == entrepriseId,
+      );
+
+      if (index >= 0) {
+        _fournisseurs[index] = Fournisseur(
+          id: _fournisseurs[index].id,
+          raisonSociale: _fournisseurs[index].raisonSociale,
+          nif: _fournisseurs[index].nif,
+          stat: _fournisseurs[index].stat,
+          statutValidation: 'actif',
+          dateCreation: _fournisseurs[index].dateCreation,
+        );
+      }
+
+      return message;
+    } on FournisseurException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage = 'Impossible de valider cette entreprise.';
+      return null;
+    } finally {
+      _validationsEnCours.remove(entrepriseId);
+      notifyListeners();
+    }
   }
 }

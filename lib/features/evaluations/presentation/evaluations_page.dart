@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../data/classement_soumission.dart';
-import '../data/commission_option.dart';
+import '../../../shared/models/commission.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import 'evaluation_controller.dart';
 
 class EvaluationsPage extends StatelessWidget {
@@ -583,6 +584,44 @@ class _InformationClassement
   }
 }
 
+const _stylesStatutClassement = {
+  'retenue': StatutChipStyle(
+    libelle: 'Retenue',
+    icone: Icons.emoji_events_outlined,
+    couleur: StatutChipCouleur.primaire,
+  ),
+  'evaluee': StatutChipStyle(
+    libelle: 'Évaluée',
+    icone: Icons.grade_outlined,
+    couleur: StatutChipCouleur.tertiaire,
+  ),
+  'évaluée': StatutChipStyle(
+    libelle: 'Évaluée',
+    icone: Icons.grade_outlined,
+    couleur: StatutChipCouleur.tertiaire,
+  ),
+  'recevable': StatutChipStyle(
+    libelle: 'Recevable',
+    icone: Icons.verified_outlined,
+    couleur: StatutChipCouleur.secondaire,
+  ),
+  'irrecevable': StatutChipStyle(
+    libelle: 'Irrecevable',
+    icone: Icons.cancel_outlined,
+    couleur: StatutChipCouleur.erreur,
+  ),
+  'rejetee': StatutChipStyle(
+    libelle: 'Rejetée',
+    icone: Icons.block_outlined,
+    couleur: StatutChipCouleur.erreur,
+  ),
+  'rejetée': StatutChipStyle(
+    libelle: 'Rejetée',
+    icone: Icons.block_outlined,
+    couleur: StatutChipCouleur.erreur,
+  ),
+};
+
 class _StatutClassementChip
     extends StatelessWidget {
   const _StatutClassementChip({
@@ -593,80 +632,9 @@ class _StatutClassementChip
 
   @override
   Widget build(BuildContext context) {
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final String libelle;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'retenue':
-        libelle = 'Retenue';
-        fond = couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone = Icons.emoji_events_outlined;
-        break;
-
-      case 'evaluee':
-      case 'évaluée':
-        libelle = 'Évaluée';
-        fond = couleurs.tertiaryContainer;
-        premierPlan =
-            couleurs.onTertiaryContainer;
-        icone = Icons.grade_outlined;
-        break;
-
-      case 'recevable':
-        libelle = 'Recevable';
-        fond = couleurs.secondaryContainer;
-        premierPlan =
-            couleurs.onSecondaryContainer;
-        icone = Icons.verified_outlined;
-        break;
-
-      case 'irrecevable':
-        libelle = 'Irrecevable';
-        fond = couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone = Icons.cancel_outlined;
-        break;
-
-      default:
-        libelle = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut.replaceAll('_', ' ');
-
-        fond =
-            couleurs.surfaceContainerHighest;
-
-        premierPlan =
-            couleurs.onSurfaceVariant;
-
-        icone = Icons.info_outline;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(
-        icone,
-        size: 17,
-        color: premierPlan,
-      ),
-      label: Text(
-        libelle,
-        style: TextStyle(
-          color: premierPlan,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return StatutChip(
+      statut: statut,
+      styles: _stylesStatutClassement,
     );
   }
 }
@@ -678,7 +646,7 @@ class _EvaluationDialog extends StatefulWidget {
   });
 
   final ClassementSoumission soumission;
-  final List<CommissionOption> commissions;
+  final List<Commission> commissions;
 
   @override
   State<_EvaluationDialog> createState() =>

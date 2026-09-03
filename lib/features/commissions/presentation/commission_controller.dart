@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../utilisateurs/data/utilisateur_gestion.dart';
-import '../data/commission_marche.dart';
+import '../../../shared/models/commission.dart';
 import '../data/commission_membre_repository.dart';
 import '../data/commission_repository.dart';
 
@@ -19,7 +19,7 @@ class CommissionController extends ChangeNotifier {
   final CommissionMembreRepository _membreRepository;
   final String _appelOffreId;
 
-  List<CommissionMarche> _commissions = [];
+  List<Commission> _commissions = [];
   List<UtilisateurGestion> _membresDisponibles = [];
 
   bool _isLoading = false;
@@ -34,7 +34,7 @@ class CommissionController extends ChangeNotifier {
 
   String get appelOffreId => _appelOffreId;
 
-  List<CommissionMarche> get commissions {
+  List<Commission> get commissions {
     return List.unmodifiable(_commissions);
   }
 
@@ -362,7 +362,7 @@ class CommissionController extends ChangeNotifier {
     }
   }
 
-  CommissionMarche? trouverCommissionParId(
+  Commission? trouverCommissionParId(
     String commissionId,
   ) {
     final id = commissionId.trim();
@@ -460,7 +460,7 @@ class CommissionController extends ChangeNotifier {
       _appelOffreId,
     );
 
-    _commissions = List<CommissionMarche>.from(
+    _commissions = List<Commission>.from(
       resultat.commissions,
     );
 

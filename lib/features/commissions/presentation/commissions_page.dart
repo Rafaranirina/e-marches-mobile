@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../../utilisateurs/data/utilisateur_gestion.dart';
-import '../data/commission_marche.dart';
+import '../../../shared/models/commission.dart';
 import 'commission_controller.dart';
 
 class CommissionsPage extends StatelessWidget {
@@ -86,7 +86,7 @@ class _CommissionsViewState
   }
 
   Future<void> _ajouterMembre(
-    CommissionMarche commission,
+    Commission commission,
   ) async {
     final controller =
         context.read<CommissionController>();
@@ -494,7 +494,7 @@ class _CommissionCard
     required this.onAjouterMembre,
   });
 
-  final CommissionMarche commission;
+  final Commission commission;
   final bool peutGerer;
   final bool ajoutEnCours;
 

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../administrations/data/administration_marche.dart';
+import '../../administrations/data/administration_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../fournisseurs/data/fournisseur.dart';
+import '../../fournisseurs/data/fournisseur_repository.dart';
 import '../data/utilisateur_gestion.dart';
 import 'utilisateur_controller.dart';
 
@@ -1167,16 +1171,16 @@ class _UtilisateurFormDialogState
   late final TextEditingController
       _motDePasseController;
 
-  late final TextEditingController
-      _administrationIdController;
-
-  late final TextEditingController
-      _entrepriseIdController;
-
   late String _role;
   late String _statut;
 
+  String? _administrationIdSelectionnee;
+  String? _entrepriseIdSelectionnee;
+
   bool _masquerMotDePasse = true;
+  bool _chargementReferentiels = true;
+  List<AdministrationMarche> _administrations = [];
+  List<Fournisseur> _entreprises = [];
 
   @override
   void initState() {
@@ -1208,18 +1212,11 @@ class _UtilisateurFormDialogState
     _motDePasseController =
         TextEditingController();
 
-    _administrationIdController =
-        TextEditingController(
-      text:
-          utilisateur?.administrationId ??
-              '',
-    );
+    _administrationIdSelectionnee =
+        utilisateur?.administrationId;
 
-    _entrepriseIdController =
-        TextEditingController(
-      text:
-          utilisateur?.entrepriseId ?? '',
-    );
+    _entrepriseIdSelectionnee =
+        utilisateur?.entrepriseId;
 
     final roleExistant =
         utilisateur?.role
@@ -1242,6 +1239,39 @@ class _UtilisateurFormDialogState
             .contains(statutExistant)
         ? statutExistant!
         : 'actif';
+
+    _chargerReferentiels();
+  }
+
+  Future<void> _chargerReferentiels() async {
+    try {
+      final resultats = await Future.wait([
+        AdministrationRepository()
+            .listerAdministrations(),
+        FournisseurRepository().lister(),
+      ]);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _administrations =
+            (resultats[0] as ListeAdministrationsResult)
+                .administrations;
+        _entreprises =
+            resultats[1] as List<Fournisseur>;
+        _chargementReferentiels = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _chargementReferentiels = false;
+      });
+    }
   }
 
   @override
@@ -1251,8 +1281,6 @@ class _UtilisateurFormDialogState
     _emailController.dispose();
     _telephoneController.dispose();
     _motDePasseController.dispose();
-    _administrationIdController.dispose();
-    _entrepriseIdController.dispose();
     super.dispose();
   }
 
@@ -1264,16 +1292,12 @@ class _UtilisateurFormDialogState
     final administrationId =
         _role == 'administration' ||
                 _role == 'commission'
-            ? _administrationIdController
-                .text
-                .trim()
+            ? _administrationIdSelectionnee
             : null;
 
     final entrepriseId =
         _role == 'fournisseur'
-            ? _entrepriseIdController
-                .text
-                .trim()
+            ? _entrepriseIdSelectionnee
             : null;
 
     Navigator.of(context).pop(
@@ -1506,38 +1530,109 @@ class _UtilisateurFormDialogState
                 if (_role == 'administration' ||
                     _role == 'commission') ...[
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller:
-                        _administrationIdController,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Identifiant administration',
-                      prefixIcon: Icon(
-                        Icons
-                            .account_balance_outlined,
-                      ),
-                      border:
-                          OutlineInputBorder(),
-                    ),
-                  ),
+                  _chargementReferentiels
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 8,
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                      : DropdownButtonFormField<String>(
+                          initialValue:
+                              _administrations.any(
+                            (administration) =>
+                                administration.id ==
+                                _administrationIdSelectionnee,
+                          )
+                                  ? _administrationIdSelectionnee
+                                  : null,
+                          isExpanded: true,
+                          decoration:
+                              const InputDecoration(
+                            labelText:
+                                'Administration',
+                            prefixIcon: Icon(
+                              Icons
+                                  .account_balance_outlined,
+                            ),
+                            border:
+                                OutlineInputBorder(),
+                          ),
+                          items: [
+                            for (final administration
+                                in _administrations)
+                              DropdownMenuItem(
+                                value: administration.id,
+                                child: Text(
+                                  administration.nom,
+                                  overflow:
+                                      TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _administrationIdSelectionnee =
+                                  value;
+                            });
+                          },
+                        ),
                 ],
                 if (_role == 'fournisseur') ...[
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller:
-                        _entrepriseIdController,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Identifiant entreprise',
-                      prefixIcon: Icon(
-                        Icons.business_outlined,
-                      ),
-                      border:
-                          OutlineInputBorder(),
-                    ),
-                  ),
+                  _chargementReferentiels
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 8,
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                      : DropdownButtonFormField<String>(
+                          initialValue: _entreprises.any(
+                            (entreprise) =>
+                                entreprise.id ==
+                                _entrepriseIdSelectionnee,
+                          )
+                                  ? _entrepriseIdSelectionnee
+                                  : null,
+                          isExpanded: true,
+                          decoration:
+                              const InputDecoration(
+                            labelText:
+                                'Entreprise',
+                            prefixIcon: Icon(
+                              Icons.business_outlined,
+                            ),
+                            border:
+                                OutlineInputBorder(),
+                          ),
+                          items: [
+                            for (final entreprise
+                                in _entreprises)
+                              DropdownMenuItem(
+                                value: entreprise.id,
+                                child: Text(
+                                  entreprise.raisonSociale,
+                                  overflow:
+                                      TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _entrepriseIdSelectionnee =
+                                  value;
+                            });
+                          },
+                        ),
                 ],
                 if (!widget
                     .estModification) ...[

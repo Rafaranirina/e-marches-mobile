@@ -626,6 +626,23 @@ class _StatutBadge extends StatelessWidget {
               couleurs.onSecondaryContainer,
         );
 
+      case 'en_evaluation':
+        return _CouleursStatut(
+          background:
+              couleurs.tertiaryContainer,
+          foreground:
+              couleurs.onTertiaryContainer,
+        );
+
+      case 'attribue':
+        return _CouleursStatut(
+          background:
+              couleurs.primaryContainer,
+          foreground:
+              couleurs.onPrimaryContainer,
+        );
+
+      case 'infructueux':
       case 'annule':
         return _CouleursStatut(
           background:
@@ -691,8 +708,14 @@ String _libelleStatut(String statut) {
     case 'cloture':
       return 'Clôturé';
 
+    case 'en_evaluation':
+      return 'En évaluation';
+
     case 'attribue':
       return 'Attribué';
+
+    case 'infructueux':
+      return 'Infructueux';
 
     case 'annule':
       return 'Annulé';
