@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/rapport_repository.dart';
 import '../data/rapport_tableau_bord.dart';
 
-class RapportController extends ChangeNotifier {
+class RapportController extends SafeChangeNotifier {
   RapportController({
     RapportRepository? repository,
   }) : _repository =
@@ -16,6 +16,11 @@ class RapportController extends ChangeNotifier {
 
   List<TopEntreprise> _topEntreprises = [];
   List<ActiviteRecente> _activitesRecentes = [];
+
+  IndicateursTransparence _transparence =
+      IndicateursTransparence.vide;
+
+  List<ActiviteMensuelle> _activiteMensuelle = [];
 
   bool _isLoading = false;
   bool _isRefreshing = false;
@@ -30,6 +35,12 @@ class RapportController extends ChangeNotifier {
 
   List<ActiviteRecente> get activitesRecentes =>
       List.unmodifiable(_activitesRecentes);
+
+  IndicateursTransparence get transparence =>
+      _transparence;
+
+  List<ActiviteMensuelle> get activiteMensuelle =>
+      List.unmodifiable(_activiteMensuelle);
 
   bool get isLoading => _isLoading;
 
@@ -51,7 +62,11 @@ class RapportController extends ChangeNotifier {
       _statistiques.totalEntreprises > 0 ||
       _statistiques.montantTotalContrats > 0 ||
       _topEntreprises.isNotEmpty ||
-      _activitesRecentes.isNotEmpty;
+      _activitesRecentes.isNotEmpty ||
+      _transparence.nombreMarchesAttribues > 0 ||
+      _transparence.nombreAttribues > 0 ||
+      _transparence.nombreInfructueux > 0 ||
+      _activiteMensuelle.isNotEmpty;
 
   Future<void> charger() async {
     if (_isLoading) {
@@ -157,6 +172,42 @@ class RapportController extends ChangeNotifier {
     }
   }
 
+  Future<void> chargerTransparence() async {
+    try {
+      _errorMessage = null;
+
+      _transparence =
+          await _repository.chargerTransparence();
+
+      notifyListeners();
+    } on RapportException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+    } catch (_) {
+      _errorMessage =
+          'Impossible de charger les indicateurs de transparence.';
+      notifyListeners();
+    }
+  }
+
+  Future<void> chargerActiviteMensuelle() async {
+    try {
+      _errorMessage = null;
+
+      _activiteMensuelle = await _repository
+          .chargerActiviteMensuelle();
+
+      notifyListeners();
+    } on RapportException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+    } catch (_) {
+      _errorMessage =
+          'Impossible de charger l’activité mensuelle.';
+      notifyListeners();
+    }
+  }
+
   void effacerErreur() {
     if (_errorMessage == null) {
       return;
@@ -178,6 +229,13 @@ class RapportController extends ChangeNotifier {
     _activitesRecentes =
         List<ActiviteRecente>.from(
       resultat.activitesRecentes,
+    );
+
+    _transparence = resultat.transparence;
+
+    _activiteMensuelle =
+        List<ActiviteMensuelle>.from(
+      resultat.activiteMensuelle,
     );
   }
 }

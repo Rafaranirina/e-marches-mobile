@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../../utilisateurs/data/utilisateur_gestion.dart';
 import '../../utilisateurs/data/utilisateur_repository.dart';
 
-class ProfilController extends ChangeNotifier {
+class ProfilController extends SafeChangeNotifier {
   ProfilController({
     UtilisateurRepository? repository,
   }) : _repository =
@@ -68,8 +68,9 @@ class ProfilController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _profil =
-          await _repository.chargerProfil();
+      _profil = await _repository.chargerProfil(
+        forcerActualisation: true,
+      );
     } on UtilisateurException catch (error) {
       _errorMessage = error.message;
     } catch (_) {

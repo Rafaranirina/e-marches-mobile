@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/actif_statut_styles.dart';
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/categorie_marche.dart';
 import 'categorie_controller.dart';
@@ -12,9 +15,21 @@ class CategoriesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final estAdministrateurNational =
+        context
+                .read<AuthController>()
+                .utilisateur
+                ?.role
+                .trim()
+                .toLowerCase() ==
+            'admin_national';
+
     return ChangeNotifierProvider(
       create: (_) => CategorieController()
-        ..charger(),
+        ..charger(
+          modeGestion:
+              estAdministrateurNational,
+        ),
       child: const _CategoriesView(),
     );
   }
@@ -48,8 +63,8 @@ class _CategoriesViewState
         await showDialog<DonneesCategorie>(
       context: context,
       builder: (_) => _CategorieFormDialog(
-        categoriesPrincipales:
-            controller.categoriesPrincipales,
+        categoriesDisponibles:
+            controller.categories,
       ),
     );
 
@@ -71,6 +86,98 @@ class _CategoriesViewState
           controller.errorMessage ??
           'Impossible de créer la catégorie.',
       estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _modifierCategorie(
+    CategorieMarche categorie,
+  ) async {
+    final controller =
+        context.read<CategorieController>();
+
+    final donnees =
+        await showDialog<DonneesCategorie>(
+      context: context,
+      builder: (_) => _CategorieFormDialog(
+        categoriesDisponibles:
+            controller.categories,
+        categorie: categorie,
+      ),
+    );
+
+    if (donnees == null || !mounted) {
+      return;
+    }
+
+    final resultat =
+        await controller.modifierCategorie(
+      categorie: categorie,
+      donnees: donnees,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier la catégorie.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _changerStatut(
+    CategorieMarche categorie,
+  ) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (_) => _StatutCategorieDialog(
+        categorie: categorie,
+      ),
+    );
+
+    if (confirme != true || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<CategorieController>();
+
+    final resultat =
+        await controller.changerStatut(
+      categorie: categorie,
+      actif: !categorie.actif,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier le statut de la catégorie.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _ouvrirDetail(
+    CategorieMarche categorie,
+  ) async {
+    final controller =
+        context.read<CategorieController>();
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChangeNotifierProvider.value(
+          value: controller,
+          child: _CategorieDetailPage(
+            categorieId: categorie.id,
+          ),
+        ),
+      ),
     );
   }
 
@@ -187,16 +294,27 @@ class _CategoriesViewState
               nombreSousCategories:
                   controller
                       .nombreSousCategories,
+              nombreInactives:
+                  controller
+                      .nombreInactives,
+              afficherInactives:
+                  estAdministrateurNational,
             ),
             _FiltresCategories(
               rechercheController:
                   _rechercheController,
               typeSelectionne:
                   controller.filtreType,
+              statutSelectionne:
+                  controller.filtreStatut,
+              afficherFiltreStatut:
+                  estAdministrateurNational,
               onRecherche:
                   controller.rechercher,
               onType:
                   controller.filtrerParType,
+              onStatut: controller
+                  .filtrerParStatut,
               onReinitialiser:
                   _reinitialiserFiltres,
             ),
@@ -204,6 +322,8 @@ class _CategoriesViewState
               child: _buildContenu(
                 controller,
                 categories,
+                estAdministrateurNational:
+                    estAdministrateurNational,
               ),
             ),
           ],
@@ -214,8 +334,9 @@ class _CategoriesViewState
 
   Widget _buildContenu(
     CategorieController controller,
-    List<CategorieMarche> categories,
-  ) {
+    List<CategorieMarche> categories, {
+    required bool estAdministrateurNational,
+  }) {
     if (controller.isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
@@ -227,7 +348,10 @@ class _CategoriesViewState
       return _ErreurCategories(
         message: controller.errorMessage ??
             'Impossible de charger les catégories.',
-        onRetry: controller.charger,
+        onRetry: () => controller.charger(
+          modeGestion:
+              estAdministrateurNational,
+        ),
       );
     }
 
@@ -272,6 +396,29 @@ class _CategoriesViewState
                     .nomCategorieParId(
               categorie.categorieParentId,
             ),
+            estAdministrateurNational:
+                estAdministrateurNational,
+            actionEnCours:
+                controller.actionEnCoursPour(
+              categorie.id,
+            ),
+            onTap: estAdministrateurNational
+                ? () {
+                    _ouvrirDetail(
+                      categorie,
+                    );
+                  }
+                : null,
+            onModifier: () {
+              _modifierCategorie(
+                categorie,
+              );
+            },
+            onChangerStatut: () {
+              _changerStatut(
+                categorie,
+              );
+            },
           );
         },
       ),
@@ -285,11 +432,15 @@ class _EnteteCategories
     required this.nombreTotal,
     required this.nombrePrincipales,
     required this.nombreSousCategories,
+    required this.nombreInactives,
+    required this.afficherInactives,
   });
 
   final int nombreTotal;
   final int nombrePrincipales;
   final int nombreSousCategories;
+  final int nombreInactives;
+  final bool afficherInactives;
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +502,14 @@ class _EnteteCategories
                     valeur:
                         nombreSousCategories,
                   ),
+                  if (afficherInactives)
+                    _CompteurChip(
+                      icon: Icons
+                          .visibility_off_outlined,
+                      label: 'Inactives',
+                      valeur:
+                          nombreInactives,
+                    ),
                 ],
               ),
             ],
@@ -391,8 +550,11 @@ class _FiltresCategories
   const _FiltresCategories({
     required this.rechercheController,
     required this.typeSelectionne,
+    required this.statutSelectionne,
+    required this.afficherFiltreStatut,
     required this.onRecherche,
     required this.onType,
+    required this.onStatut,
     required this.onReinitialiser,
   });
 
@@ -400,9 +562,12 @@ class _FiltresCategories
       rechercheController;
 
   final String typeSelectionne;
+  final String statutSelectionne;
+  final bool afficherFiltreStatut;
 
   final ValueChanged<String> onRecherche;
   final ValueChanged<String> onType;
+  final ValueChanged<String> onStatut;
   final VoidCallback onReinitialiser;
 
   @override
@@ -477,6 +642,48 @@ class _FiltresCategories
                   }
                 },
               ),
+              if (afficherFiltreStatut) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<
+                    String>(
+                  initialValue:
+                      statutSelectionne,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Statut',
+                    prefixIcon: Icon(
+                      Icons.info_outline,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'toutes',
+                      child: Text(
+                        'Tous les statuts',
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'actives',
+                      child: Text(
+                        'Actives',
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'inactives',
+                      child: Text(
+                        'Inactives',
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      onStatut(value);
+                    }
+                  },
+                ),
+              ],
               const SizedBox(height: 10),
               Align(
                 alignment:
@@ -501,101 +708,208 @@ class _FiltresCategories
   }
 }
 
+enum _ActionCategorie {
+  modifier,
+  statut,
+}
+
 class _CategorieCard extends StatelessWidget {
   const _CategorieCard({
     required this.categorie,
     required this.nomCategorieParente,
+    required this.estAdministrateurNational,
+    required this.actionEnCours,
+    required this.onModifier,
+    required this.onChangerStatut,
+    this.onTap,
   });
 
   final CategorieMarche categorie;
   final String nomCategorieParente;
+  final bool estAdministrateurNational;
+  final bool actionEnCours;
+
+  final VoidCallback onModifier;
+  final VoidCallback onChangerStatut;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 25,
-                  child: Icon(
-                    categorie
-                            .estCategoriePrincipale
-                        ? Icons.folder_outlined
-                        : Icons
-                            .subdirectory_arrow_right_outlined,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    child: Icon(
+                      categorie
+                              .estCategoriePrincipale
+                          ? Icons
+                              .folder_outlined
+                          : Icons
+                              .subdirectory_arrow_right_outlined,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        categorie.nom,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight:
-                                  FontWeight.bold,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+                      children: [
+                        Text(
+                          categorie.nom,
+                          style: Theme.of(
+                            context,
+                          )
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                              ),
+                        ),
+                        const SizedBox(
+                          height: 5,
+                        ),
+                        Text(
+                          categorie
+                              .descriptionAffichee,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (estAdministrateurNational)
+                    if (actionEnCours)
+                      const Padding(
+                        padding:
+                            EdgeInsets.all(
+                          10,
+                        ),
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    else
+                      PopupMenuButton<
+                          _ActionCategorie>(
+                        tooltip: 'Actions',
+                        onSelected: (action) {
+                          switch (action) {
+                            case _ActionCategorie
+                                  .modifier:
+                              onModifier();
+                              break;
+
+                            case _ActionCategorie
+                                  .statut:
+                              onChangerStatut();
+                              break;
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value:
+                                _ActionCategorie
+                                    .modifier,
+                            child: ListTile(
+                              contentPadding:
+                                  EdgeInsets
+                                      .zero,
+                              leading: Icon(
+                                Icons
+                                    .edit_outlined,
+                              ),
+                              title: Text(
+                                'Modifier',
+                              ),
                             ),
+                          ),
+                          PopupMenuItem(
+                            value:
+                                _ActionCategorie
+                                    .statut,
+                            child: ListTile(
+                              contentPadding:
+                                  EdgeInsets
+                                      .zero,
+                              leading: Icon(
+                                categorie.actif
+                                    ? Icons
+                                        .visibility_off_outlined
+                                    : Icons
+                                        .visibility_outlined,
+                              ),
+                              title: Text(
+                                categorie.actif
+                                    ? 'Désactiver'
+                                    : 'Activer',
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        categorie
-                            .descriptionAffichee,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  avatar: Icon(
-                    categorie
-                            .estCategoriePrincipale
-                        ? Icons
-                            .account_tree_outlined
-                        : Icons
-                            .subdirectory_arrow_right_outlined,
-                    size: 17,
-                  ),
-                  label: Text(
-                    categorie
-                            .estCategoriePrincipale
-                        ? 'Catégorie principale'
-                        : 'Sous-catégorie',
-                  ),
-                ),
-              ],
-            ),
-            if (categorie
-                .estSousCategorie) ...[
-              const Divider(height: 28),
-              _DetailCategorie(
-                icon:
-                    Icons.folder_copy_outlined,
-                label:
-                    'Catégorie parente',
-                valeur:
-                    nomCategorieParente,
+                ],
               ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(
+                    avatar: Icon(
+                      categorie
+                              .estCategoriePrincipale
+                          ? Icons
+                              .account_tree_outlined
+                          : Icons
+                              .subdirectory_arrow_right_outlined,
+                      size: 17,
+                    ),
+                    label: Text(
+                      categorie
+                              .estCategoriePrincipale
+                          ? 'Catégorie principale'
+                          : 'Sous-catégorie',
+                    ),
+                  ),
+                  if (estAdministrateurNational)
+                    StatutChip(
+                      statut: cleActifStatut(categorie.actif),
+                      styles: actifStatutStyles,
+                    ),
+                ],
+              ),
+              if (categorie
+                  .estSousCategorie) ...[
+                const Divider(height: 28),
+                _DetailCategorie(
+                  icon: Icons
+                      .folder_copy_outlined,
+                  label:
+                      'Catégorie parente',
+                  valeur:
+                      nomCategorieParente,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -641,11 +955,17 @@ class _DetailCategorie
 class _CategorieFormDialog
     extends StatefulWidget {
   const _CategorieFormDialog({
-    required this.categoriesPrincipales,
+    required this.categoriesDisponibles,
+    this.categorie,
   });
 
   final List<CategorieMarche>
-      categoriesPrincipales;
+      categoriesDisponibles;
+
+  final CategorieMarche? categorie;
+
+  bool get estModification =>
+      categorie != null;
 
   @override
   State<_CategorieFormDialog>
@@ -658,15 +978,32 @@ class _CategorieFormDialogState
   final GlobalKey<FormState> _formKey =
       GlobalKey<FormState>();
 
-  final TextEditingController
-      _nomController =
-      TextEditingController();
+  late final TextEditingController
+      _nomController;
 
-  final TextEditingController
-      _descriptionController =
-      TextEditingController();
+  late final TextEditingController
+      _descriptionController;
 
   String? _categorieParentId;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final categorie = widget.categorie;
+
+    _nomController = TextEditingController(
+      text: categorie?.nom ?? '',
+    );
+
+    _descriptionController =
+        TextEditingController(
+      text: categorie?.description ?? '',
+    );
+
+    _categorieParentId =
+        categorie?.categorieParentId;
+  }
 
   @override
   void dispose() {
@@ -695,20 +1032,39 @@ class _CategorieFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    final categoriesPrincipales =
+    final categorieActuelleId =
+        widget.categorie?.id;
+
+    final optionsParent =
         List<CategorieMarche>.from(
-      widget.categoriesPrincipales,
-    )..sort(
-        (a, b) => a.nom
-            .toLowerCase()
-            .compareTo(
-              b.nom.toLowerCase(),
-            ),
-      );
+      widget.categoriesDisponibles,
+    )
+          ..removeWhere(
+            (categorie) =>
+                categorie.id ==
+                categorieActuelleId,
+          )
+          ..sort(
+            (a, b) => a.nom
+                .toLowerCase()
+                .compareTo(
+                  b.nom.toLowerCase(),
+                ),
+          );
+
+    final parentValide = optionsParent.any(
+          (categorie) =>
+              categorie.id ==
+              _categorieParentId,
+        )
+        ? _categorieParentId
+        : null;
 
     return AlertDialog(
-      title: const Text(
-        'Créer une catégorie',
+      title: Text(
+        widget.estModification
+            ? 'Modifier la catégorie'
+            : 'Créer une catégorie',
       ),
       content: SizedBox(
         width: 540,
@@ -768,8 +1124,7 @@ class _CategorieFormDialogState
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue:
-                      _categorieParentId ??
-                          '',
+                      parentValide ?? '',
                   isExpanded: true,
                   decoration:
                       const InputDecoration(
@@ -791,7 +1146,7 @@ class _CategorieFormDialogState
                         'Aucune — catégorie principale',
                       ),
                     ),
-                    ...categoriesPrincipales.map(
+                    ...optionsParent.map(
                       (categorie) =>
                           DropdownMenuItem(
                         value: categorie.id,
@@ -832,15 +1187,457 @@ class _CategorieFormDialogState
         ),
         FilledButton.icon(
           onPressed: _confirmer,
-          icon: const Icon(
-            Icons
-                .create_new_folder_outlined,
+          icon: Icon(
+            widget.estModification
+                ? Icons.save_outlined
+                : Icons
+                    .create_new_folder_outlined,
           ),
-          label: const Text(
-            'Créer',
+          label: Text(
+            widget.estModification
+                ? 'Enregistrer'
+                : 'Créer',
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StatutCategorieDialog
+    extends StatelessWidget {
+  const _StatutCategorieDialog({
+    required this.categorie,
+  });
+
+  final CategorieMarche categorie;
+
+  @override
+  Widget build(BuildContext context) {
+    final activer = !categorie.actif;
+
+    return AlertDialog(
+      title: Text(
+        activer
+            ? 'Activer la catégorie'
+            : 'Désactiver la catégorie',
+      ),
+      content: Text(
+        activer
+            ? 'Voulez-vous activer « ${categorie.nom} » ? '
+                'Elle redeviendra visible et sélectionnable.'
+            : 'Voulez-vous désactiver « ${categorie.nom} » ? '
+                'Elle ne sera plus visible ni sélectionnable. '
+                'Ses éventuelles sous-catégories actives doivent '
+                'd’abord être désactivées.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop(false);
+          },
+          child: const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop(true);
+          },
+          icon: Icon(
+            activer
+                ? Icons.visibility_outlined
+                : Icons
+                    .visibility_off_outlined,
+          ),
+          label: Text(
+            activer ? 'Activer' : 'Désactiver',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategorieDetailPage
+    extends StatefulWidget {
+  const _CategorieDetailPage({
+    required this.categorieId,
+  });
+
+  final String categorieId;
+
+  @override
+  State<_CategorieDetailPage>
+      createState() =>
+          _CategorieDetailPageState();
+}
+
+class _CategorieDetailPageState
+    extends State<_CategorieDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      context
+          .read<CategorieController>()
+          .rafraichirDetail(
+        widget.categorieId,
+      );
+    });
+  }
+
+  Future<void> _modifier(
+    CategorieMarche categorie,
+  ) async {
+    final controller =
+        context.read<CategorieController>();
+
+    final donnees =
+        await showDialog<DonneesCategorie>(
+      context: context,
+      builder: (_) => _CategorieFormDialog(
+        categoriesDisponibles:
+            controller.categories,
+        categorie: categorie,
+      ),
+    );
+
+    if (donnees == null || !mounted) {
+      return;
+    }
+
+    final resultat =
+        await controller.modifierCategorie(
+      categorie: categorie,
+      donnees: donnees,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier la catégorie.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _changerStatut(
+    CategorieMarche categorie,
+  ) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (_) => _StatutCategorieDialog(
+        categorie: categorie,
+      ),
+    );
+
+    if (confirme != true || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<CategorieController>();
+
+    final resultat =
+        await controller.changerStatut(
+      categorie: categorie,
+      actif: !categorie.actif,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier le statut de la catégorie.',
+      estErreur: resultat == null,
+    );
+  }
+
+  void _afficherMessage(
+    String message, {
+    bool estErreur = false,
+  }) {
+    final messenger =
+        ScaffoldMessenger.of(context);
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: estErreur
+              ? Theme.of(context)
+                  .colorScheme
+                  .error
+              : null,
+          content: Text(message),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller =
+        context.watch<CategorieController>();
+
+    final categorie = controller.trouverParId(
+      widget.categorieId,
+    );
+
+    if (categorie == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Catégorie',
+          ),
+        ),
+        body: const Center(
+          child: Text(
+            'Cette catégorie est introuvable.',
+          ),
+        ),
+      );
+    }
+
+    final actionEnCours =
+        controller.actionEnCoursPour(
+      categorie.id,
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(categorie.nom),
+        actions: [
+          IconButton(
+            tooltip: 'Modifier',
+            onPressed: actionEnCours
+                ? null
+                : () {
+                    _modifier(categorie);
+                  },
+            icon: const Icon(
+              Icons.edit_outlined,
+            ),
+          ),
+          IconButton(
+            tooltip: categorie.actif
+                ? 'Désactiver'
+                : 'Activer',
+            onPressed: actionEnCours
+                ? null
+                : () {
+                    _changerStatut(
+                      categorie,
+                    );
+                  },
+            icon: Icon(
+              categorie.actif
+                  ? Icons
+                      .visibility_off_outlined
+                  : Icons
+                      .visibility_outlined,
+            ),
+          ),
+        ],
+        bottom: actionEnCours
+            ? const PreferredSize(
+                preferredSize:
+                    Size.fromHeight(3),
+                child:
+                    LinearProgressIndicator(),
+              )
+            : null,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 25,
+                          child: Icon(
+                            categorie
+                                    .estCategoriePrincipale
+                                ? Icons
+                                    .folder_outlined
+                                : Icons
+                                    .subdirectory_arrow_right_outlined,
+                          ),
+                        ),
+                        const SizedBox(
+                          width: 14,
+                        ),
+                        Expanded(
+                          child: Text(
+                            categorie.nom,
+                            style: Theme.of(
+                              context,
+                            )
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontWeight:
+                                      FontWeight
+                                          .bold,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          avatar: Icon(
+                            categorie
+                                    .estCategoriePrincipale
+                                ? Icons
+                                    .account_tree_outlined
+                                : Icons
+                                    .subdirectory_arrow_right_outlined,
+                            size: 17,
+                          ),
+                          label: Text(
+                            categorie
+                                    .estCategoriePrincipale
+                                ? 'Catégorie principale'
+                                : 'Sous-catégorie',
+                          ),
+                        ),
+                        StatutChip(
+                          statut:
+                              cleActifStatut(categorie.actif),
+                          styles: actifStatutStyles,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Text(
+                      'Informations',
+                      style: Theme.of(
+                        context,
+                      )
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight
+                                    .bold,
+                          ),
+                    ),
+                    const SizedBox(
+                      height: 14,
+                    ),
+                    _DetailCategorie(
+                      icon: Icons
+                          .description_outlined,
+                      label: 'Description',
+                      valeur: categorie
+                          .descriptionAffichee,
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    _DetailCategorie(
+                      icon: Icons
+                          .folder_copy_outlined,
+                      label:
+                          'Catégorie parente',
+                      valeur: categorie
+                          .categorieParenteAffichee,
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    _DetailCategorie(
+                      icon: Icons
+                          .subdirectory_arrow_right_outlined,
+                      label:
+                          'Sous-catégories',
+                      valeur:
+                          '${categorie.nombreSousCategories}',
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    _DetailCategorie(
+                      icon: Icons
+                          .campaign_outlined,
+                      label:
+                          'Appels d’offres liés',
+                      valeur:
+                          '${categorie.nombreAppelsOffres}',
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    _DetailCategorie(
+                      icon:
+                          Icons.event_outlined,
+                      label: 'Créée le',
+                      valeur: _formatDateHeure(
+                        categorie
+                            .dateCreation,
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    _DetailCategorie(
+                      icon: Icons
+                          .update_outlined,
+                      label:
+                          'Dernière modification',
+                      valeur: _formatDateHeure(
+                        categorie.dateMaj,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -864,14 +1661,8 @@ class _ErreurCategories
           mainAxisSize:
               MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 66,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign:
@@ -915,14 +1706,13 @@ class _CategoriesVides
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          Icon(
-            filtreActif
-                ? Icons
-                    .search_off_outlined
+          CircleIcon.neutre(
+            context,
+            icon: filtreActif
+                ? Icons.search_off_outlined
                 : Icons.category_outlined,
-            size: 72,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             filtreActif
                 ? 'Aucune catégorie ne correspond aux filtres.'
@@ -936,4 +1726,33 @@ class _CategoriesVides
       ),
     );
   }
+}
+
+String _formatDateHeure(
+  DateTime? date,
+) {
+  if (date == null) {
+    return 'Non renseignée';
+  }
+
+  final dateLocale = date.toLocal();
+
+  final jour = dateLocale.day
+      .toString()
+      .padLeft(2, '0');
+
+  final mois = dateLocale.month
+      .toString()
+      .padLeft(2, '0');
+
+  final heure = dateLocale.hour
+      .toString()
+      .padLeft(2, '0');
+
+  final minute = dateLocale.minute
+      .toString()
+      .padLeft(2, '0');
+
+  return '$jour/$mois/${dateLocale.year} '
+      'à $heure:$minute';
 }

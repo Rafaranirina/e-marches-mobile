@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../data/auth_repository.dart';
+import 'auth_controller.dart';
 import 'login_page.dart';
 
 /// Le mobile ne configure pas de deep link pour ouvrir l'app depuis le lien
@@ -21,7 +22,6 @@ class _ReinitialiserMotDePassePageState
   final _tokenController = TextEditingController();
   final _motDePasseController = TextEditingController();
   final _confirmationController = TextEditingController();
-  final _repository = AuthRepository();
 
   bool _isLoading = false;
   bool _obscure = true;
@@ -45,10 +45,12 @@ class _ReinitialiserMotDePassePageState
       _isLoading = true;
     });
 
-    final resultat = await _repository.reinitialiserMotDePasse(
-      token: _tokenController.text,
-      nouveauMotDePasse: _motDePasseController.text,
-    );
+    final resultat = await context
+        .read<AuthController>()
+        .reinitialiserMotDePasse(
+          token: _tokenController.text,
+          nouveauMotDePasse: _motDePasseController.text,
+        );
 
     if (!mounted) {
       return;

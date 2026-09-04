@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/actif_statut_styles.dart';
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/administration_marche.dart';
 import 'administration_controller.dart';
+import 'administration_detail_page.dart';
 
 class AdministrationsPage extends StatelessWidget {
   const AdministrationsPage({
@@ -69,6 +73,98 @@ class _AdministrationsViewState
           controller.errorMessage ??
           'Impossible de créer l’administration.',
       estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _modifierAdministration(
+    AdministrationMarche administration,
+  ) async {
+    final donnees =
+        await showDialog<DonneesAdministration>(
+      context: context,
+      builder: (_) => _AdministrationFormDialog(
+        administration: administration,
+      ),
+    );
+
+    if (donnees == null || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<AdministrationController>();
+
+    final resultat =
+        await controller.modifierAdministration(
+      administration: administration,
+      donnees: donnees,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier l’administration.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _changerStatut(
+    AdministrationMarche administration,
+  ) async {
+    final nouveauStatut = await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          _StatutAdministrationDialog(
+        administration: administration,
+      ),
+    );
+
+    if (nouveauStatut == null || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<AdministrationController>();
+
+    final resultat =
+        await controller.changerStatut(
+      administration: administration,
+      actif: nouveauStatut,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier le statut.',
+      estErreur: resultat == null,
+    );
+  }
+
+  void _ouvrirDetail(
+    AdministrationMarche administration,
+  ) {
+    final controller =
+        context.read<AdministrationController>();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ChangeNotifierProvider.value(
+          value: controller,
+          child: AdministrationDetailPage(
+            administrationId:
+                administration.id,
+          ),
+        ),
+      ),
     );
   }
 
@@ -255,9 +351,30 @@ class _AdministrationsViewState
         separatorBuilder: (_, _) =>
             const SizedBox(height: 10),
         itemBuilder: (context, index) {
+          final administration =
+              administrations[index];
+
           return _AdministrationCard(
-            administration:
-                administrations[index],
+            administration: administration,
+            actionEnCours:
+                controller.actionEnCoursPour(
+              administration.id,
+            ),
+            onTap: () {
+              _ouvrirDetail(
+                administration,
+              );
+            },
+            onModifier: () {
+              _modifierAdministration(
+                administration,
+              );
+            },
+            onChangerStatut: () {
+              _changerStatut(
+                administration,
+              );
+            },
           );
         },
       ),
@@ -419,13 +536,27 @@ class _RechercheAdministrations
   }
 }
 
+enum _ActionAdministration {
+  modifier,
+  statut,
+}
+
 class _AdministrationCard
     extends StatelessWidget {
   const _AdministrationCard({
     required this.administration,
+    required this.actionEnCours,
+    required this.onTap,
+    required this.onModifier,
+    required this.onChangerStatut,
   });
 
   final AdministrationMarche administration;
+  final bool actionEnCours;
+
+  final VoidCallback onTap;
+  final VoidCallback onModifier;
+  final VoidCallback onChangerStatut;
 
   @override
   Widget build(BuildContext context) {
@@ -436,7 +567,9 @@ class _AdministrationCard
         administration.typeEntite.trim();
 
     return Card(
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment:
@@ -481,6 +614,77 @@ class _AdministrationCard
                     ],
                   ),
                 ),
+                if (actionEnCours)
+                  const Padding(
+                    padding:
+                        EdgeInsets.all(10),
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child:
+                          CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                else
+                  PopupMenuButton<
+                      _ActionAdministration>(
+                    tooltip: 'Actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _ActionAdministration
+                              .modifier:
+                          onModifier();
+                          break;
+
+                        case _ActionAdministration
+                              .statut:
+                          onChangerStatut();
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value:
+                            _ActionAdministration
+                                .modifier,
+                        child: ListTile(
+                          contentPadding:
+                              EdgeInsets.zero,
+                          leading: Icon(
+                            Icons.edit_outlined,
+                          ),
+                          title: Text(
+                            'Modifier',
+                          ),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value:
+                            _ActionAdministration
+                                .statut,
+                        child: ListTile(
+                          contentPadding:
+                              EdgeInsets.zero,
+                          leading: Icon(
+                            administration
+                                    .actif
+                                ? Icons
+                                    .block_outlined
+                                : Icons
+                                    .check_circle_outline,
+                          ),
+                          title: Text(
+                            administration
+                                    .actif
+                                ? 'Désactiver'
+                                : 'Activer',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 14),
@@ -500,17 +704,9 @@ class _AdministrationCard
                           .typeEntiteFormate,
                     ),
                   ),
-                Chip(
-                  avatar: const Icon(
-                    Icons
-                        .check_circle_outline,
-                    size: 17,
-                  ),
-                  label: Text(
-                    administration.actif
-                        ? 'Active'
-                        : 'Inactive',
-                  ),
+                StatutChip(
+                  statut: cleActifStatut(administration.actif),
+                  styles: actifStatutStyles,
                 ),
               ],
             ),
@@ -563,6 +759,7 @@ class _AdministrationCard
                 ),
             ],
           ],
+        ),
         ),
       ),
     );
@@ -627,7 +824,14 @@ class _DetailAdministration
 
 class _AdministrationFormDialog
     extends StatefulWidget {
-  const _AdministrationFormDialog();
+  const _AdministrationFormDialog({
+    this.administration,
+  });
+
+  final AdministrationMarche? administration;
+
+  bool get estModification =>
+      administration != null;
 
   @override
   State<_AdministrationFormDialog>
@@ -640,29 +844,58 @@ class _AdministrationFormDialogState
   final GlobalKey<FormState> _formKey =
       GlobalKey<FormState>();
 
-  final TextEditingController
-      _nomController =
-      TextEditingController();
+  late final TextEditingController
+      _nomController;
 
-  final TextEditingController
-      _sigleController =
-      TextEditingController();
+  late final TextEditingController
+      _sigleController;
 
-  final TextEditingController
-      _typeEntiteController =
-      TextEditingController();
+  late final TextEditingController
+      _typeEntiteController;
 
-  final TextEditingController
-      _adresseController =
-      TextEditingController();
+  late final TextEditingController
+      _adresseController;
 
-  final TextEditingController
-      _telephoneController =
-      TextEditingController();
+  late final TextEditingController
+      _telephoneController;
 
-  final TextEditingController
-      _emailController =
-      TextEditingController();
+  late final TextEditingController
+      _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final administration =
+        widget.administration;
+
+    _nomController = TextEditingController(
+      text: administration?.nom ?? '',
+    );
+
+    _sigleController = TextEditingController(
+      text: administration?.sigle ?? '',
+    );
+
+    _typeEntiteController =
+        TextEditingController(
+      text: administration?.typeEntite ?? '',
+    );
+
+    _adresseController =
+        TextEditingController(
+      text: administration?.adresse ?? '',
+    );
+
+    _telephoneController =
+        TextEditingController(
+      text: administration?.telephone ?? '',
+    );
+
+    _emailController = TextEditingController(
+      text: administration?.email ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -700,8 +933,10 @@ class _AdministrationFormDialogState
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text(
-        'Créer une administration',
+      title: Text(
+        widget.estModification
+            ? 'Modifier l’administration'
+            : 'Créer une administration',
       ),
       content: SizedBox(
         width: 560,
@@ -865,11 +1100,85 @@ class _AdministrationFormDialogState
         ),
         FilledButton.icon(
           onPressed: _confirmer,
-          icon: const Icon(
-            Icons.add_business_outlined,
+          icon: Icon(
+            widget.estModification
+                ? Icons.save_outlined
+                : Icons
+                    .add_business_outlined,
           ),
-          label: const Text(
-            'Créer',
+          label: Text(
+            widget.estModification
+                ? 'Enregistrer'
+                : 'Créer',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatutAdministrationDialog
+    extends StatefulWidget {
+  const _StatutAdministrationDialog({
+    required this.administration,
+  });
+
+  final AdministrationMarche administration;
+
+  @override
+  State<_StatutAdministrationDialog>
+      createState() =>
+          _StatutAdministrationDialogState();
+}
+
+class _StatutAdministrationDialogState
+    extends State<
+        _StatutAdministrationDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final estActif =
+        widget.administration.actif;
+
+    final nouveauStatut = !estActif;
+
+    return AlertDialog(
+      title: Text(
+        estActif
+            ? 'Désactiver l’administration'
+            : 'Activer l’administration',
+      ),
+      content: Text(
+        estActif
+            ? 'Voulez-vous vraiment désactiver '
+                '« ${widget.administration.nomAffiche} » ? '
+                'Ses comptes utilisateurs actifs '
+                'doivent être désactivés au préalable.'
+            : 'Voulez-vous vraiment activer '
+                '« ${widget.administration.nomAffiche} » ?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop(
+              nouveauStatut,
+            );
+          },
+          icon: Icon(
+            estActif
+                ? Icons.block_outlined
+                : Icons
+                    .check_circle_outline,
+          ),
+          label: Text(
+            estActif ? 'Désactiver' : 'Activer',
           ),
         ),
       ],
@@ -896,14 +1205,8 @@ class _ErreurAdministrations
           mainAxisSize:
               MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 66,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign:
@@ -947,15 +1250,13 @@ class _AdministrationsVides
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          Icon(
-            filtreActif
-                ? Icons
-                    .search_off_outlined
-                : Icons
-                    .account_balance_outlined,
-            size: 72,
+          CircleIcon.neutre(
+            context,
+            icon: filtreActif
+                ? Icons.search_off_outlined
+                : Icons.account_balance_outlined,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             filtreActif
                 ? 'Aucune administration ne correspond à la recherche.'

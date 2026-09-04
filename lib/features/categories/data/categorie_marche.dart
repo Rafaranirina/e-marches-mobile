@@ -4,12 +4,29 @@ class CategorieMarche {
     required this.nom,
     required this.description,
     this.categorieParentId,
+    this.categorieParentNom,
+    this.categorieParentActif,
+    this.actif = true,
+    this.dateCreation,
+    this.dateMaj,
+    this.nombreSousCategories = 0,
+    this.nombreAppelsOffres = 0,
   });
 
   final String id;
   final String nom;
   final String description;
   final String? categorieParentId;
+  final String? categorieParentNom;
+  final bool? categorieParentActif;
+
+  final bool actif;
+
+  final DateTime? dateCreation;
+  final DateTime? dateMaj;
+
+  final int nombreSousCategories;
+  final int nombreAppelsOffres;
 
   factory CategorieMarche.fromJson(
     Map<String, dynamic> json,
@@ -28,6 +45,30 @@ class CategorieMarche {
           _parseStringNullable(
         json['categorie_parent_id'],
       ),
+      categorieParentNom:
+          _parseStringNullable(
+        json['categorie_parent_nom'],
+      ),
+      categorieParentActif:
+          _parseBoolNullable(
+        json['categorie_parent_active'],
+      ),
+      actif: _parseBool(
+        json['actif'],
+        valeurParDefaut: true,
+      ),
+      dateCreation: _parseDate(
+        json['date_creation'],
+      ),
+      dateMaj: _parseDate(
+        json['date_maj'],
+      ),
+      nombreSousCategories: _parseInt(
+        json['nombre_sous_categories'],
+      ),
+      nombreAppelsOffres: _parseInt(
+        json['nombre_appels_offres'],
+      ),
     );
   }
 
@@ -36,7 +77,14 @@ class CategorieMarche {
     String? nom,
     String? description,
     String? categorieParentId,
+    String? categorieParentNom,
+    bool? categorieParentActif,
     bool supprimerCategorieParent = false,
+    bool? actif,
+    DateTime? dateCreation,
+    DateTime? dateMaj,
+    int? nombreSousCategories,
+    int? nombreAppelsOffres,
   }) {
     return CategorieMarche(
       id: id ?? this.id,
@@ -48,6 +96,26 @@ class CategorieMarche {
               ? null
               : categorieParentId ??
                   this.categorieParentId,
+      categorieParentNom:
+          supprimerCategorieParent
+              ? null
+              : categorieParentNom ??
+                  this.categorieParentNom,
+      categorieParentActif:
+          supprimerCategorieParent
+              ? null
+              : categorieParentActif ??
+                  this.categorieParentActif,
+      actif: actif ?? this.actif,
+      dateCreation:
+          dateCreation ?? this.dateCreation,
+      dateMaj: dateMaj ?? this.dateMaj,
+      nombreSousCategories:
+          nombreSousCategories ??
+              this.nombreSousCategories,
+      nombreAppelsOffres:
+          nombreAppelsOffres ??
+              this.nombreAppelsOffres,
     );
   }
 
@@ -60,12 +128,28 @@ class CategorieMarche {
     return !estCategoriePrincipale;
   }
 
+  bool get estActive => actif;
+
+  bool get estInactive => !actif;
+
+  String get statutFormate =>
+      actif ? 'Active' : 'Inactive';
+
   String get descriptionAffichee {
     final texte = description.trim();
 
     return texte.isEmpty
         ? 'Aucune description'
         : texte;
+  }
+
+  String get categorieParenteAffichee {
+    final nom =
+        categorieParentNom?.trim() ?? '';
+
+    return nom.isEmpty
+        ? 'Aucune — catégorie principale'
+        : nom;
   }
 }
 
@@ -166,6 +250,46 @@ String? _nullableString(
   return texte.isEmpty ? null : texte;
 }
 
+bool _parseBool(
+  dynamic valeur, {
+  bool valeurParDefaut = false,
+}) {
+  if (valeur == null) {
+    return valeurParDefaut;
+  }
+
+  if (valeur is bool) {
+    return valeur;
+  }
+
+  if (valeur is num) {
+    return valeur != 0;
+  }
+
+  final texte = valeur
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  if (texte.isEmpty) {
+    return valeurParDefaut;
+  }
+
+  return texte == 'true' ||
+      texte == '1' ||
+      texte == 'oui';
+}
+
+bool? _parseBoolNullable(
+  dynamic valeur,
+) {
+  if (valeur == null) {
+    return null;
+  }
+
+  return _parseBool(valeur);
+}
+
 int _parseInt(
   dynamic valeur, {
   int valeurParDefaut = 0,
@@ -188,4 +312,17 @@ int _parseInt(
   return int.tryParse(texte) ??
       double.tryParse(texte)?.toInt() ??
       valeurParDefaut;
+}
+
+DateTime? _parseDate(
+  dynamic valeur,
+) {
+  final texte =
+      valeur?.toString().trim() ?? '';
+
+  if (texte.isEmpty) {
+    return null;
+  }
+
+  return DateTime.tryParse(texte);
 }

@@ -1,10 +1,10 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../../utilisateurs/data/utilisateur_gestion.dart';
 import '../../utilisateurs/data/utilisateur_repository.dart';
 import '../data/parametres_repository.dart';
 
-class ParametresController extends ChangeNotifier {
+class ParametresController extends SafeChangeNotifier {
   ParametresController({
     ParametresRepository? repository,
     UtilisateurRepository? utilisateurRepository,
@@ -43,13 +43,17 @@ class ParametresController extends ChangeNotifier {
 
   bool get hasError => _errorMessage != null;
 
-  Future<void> charger() async {
+  Future<void> charger({
+    bool forcerActualisation = false,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _profil = await _utilisateurRepository.chargerProfil();
+      _profil = await _utilisateurRepository.chargerProfil(
+        forcerActualisation: forcerActualisation,
+      );
     } on UtilisateurException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
@@ -81,6 +85,8 @@ class ParametresController extends ChangeNotifier {
         prenom: prenom,
         telephone: telephone,
       );
+
+      UtilisateurRepository.definirProfilEnCache(_profil!);
 
       return 'Profil mis à jour.';
     } on ParametresException catch (error) {
@@ -174,7 +180,7 @@ class ParametresController extends ChangeNotifier {
       final message = await _repository.verifier2FA(code: code);
 
       _activation2FA = null;
-      await charger();
+      await charger(forcerActualisation: true);
 
       return message;
     } on ParametresException catch (error) {
@@ -198,7 +204,7 @@ class ParametresController extends ChangeNotifier {
       final message =
           await _repository.desactiver2FA(motDePasse: motDePasse);
 
-      await charger();
+      await charger(forcerActualisation: true);
 
       return message;
     } on ParametresException catch (error) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../../utilisateurs/data/utilisateur_gestion.dart';
+import '../../utilisateurs/presentation/utilisateur_statut_styles.dart';
 import 'profil_controller.dart';
 
 class ProfilPage extends StatelessWidget {
@@ -266,6 +269,7 @@ class _EnteteProfil extends StatelessWidget {
   Widget build(BuildContext context) {
     final nomComplet =
         profil.nomComplet.trim();
+    final scheme = Theme.of(context).colorScheme;
 
     return Card(
       child: Padding(
@@ -274,6 +278,8 @@ class _EnteteProfil extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 48,
+              backgroundColor: scheme.primaryContainer,
+              foregroundColor: scheme.onPrimaryContainer,
               child: Text(
                 _initiales(profil),
                 style: Theme.of(context)
@@ -282,6 +288,7 @@ class _EnteteProfil extends StatelessWidget {
                     ?.copyWith(
                       fontWeight:
                           FontWeight.bold,
+                      color: scheme.onPrimaryContainer,
                     ),
               ),
             ),
@@ -297,12 +304,14 @@ class _EnteteProfil extends StatelessWidget {
                   ?.copyWith(
                     fontWeight:
                         FontWeight.bold,
+                    color: scheme.onSurface,
                   ),
             ),
             const SizedBox(height: 6),
             Text(
               profil.email,
               textAlign: TextAlign.center,
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -320,8 +329,9 @@ class _EnteteProfil extends StatelessWidget {
                     profil.roleFormate,
                   ),
                 ),
-                _StatutProfilChip(
-                  profil: profil,
+                StatutChip(
+                  statut: profil.statut,
+                  styles: utilisateurStatutStyles,
                 ),
               ],
             ),
@@ -369,6 +379,8 @@ class _SectionProfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -380,9 +392,7 @@ class _SectionProfil extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary,
+                  color: scheme.primary,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -394,6 +404,7 @@ class _SectionProfil extends StatelessWidget {
                         ?.copyWith(
                           fontWeight:
                               FontWeight.bold,
+                          color: scheme.onSurface,
                         ),
                   ),
                 ),
@@ -430,6 +441,7 @@ class _LigneProfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final valeurAffichee =
         valeur.trim().isEmpty
             ? 'Non renseigné'
@@ -442,9 +454,7 @@ class _LigneProfil extends StatelessWidget {
         Icon(
           icon,
           size: 20,
-          color: Theme.of(context)
-              .colorScheme
-              .primary,
+          color: scheme.primary,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -456,78 +466,24 @@ class _LigneProfil extends StatelessWidget {
                 label,
                 style: Theme.of(context)
                     .textTheme
-                    .bodySmall,
+                    .bodySmall
+                    ?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 3),
               SelectableText(
                 valeurAffichee,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight:
                       FontWeight.w600,
+                  color: scheme.onSurface,
                 ),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatutProfilChip
-    extends StatelessWidget {
-  const _StatutProfilChip({
-    required this.profil,
-  });
-
-  final UtilisateurGestion profil;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final Color fond;
-    final Color texte;
-    final IconData icon;
-
-    if (profil.estActif) {
-      fond = couleurs.primaryContainer;
-      texte = couleurs.onPrimaryContainer;
-      icon = Icons.check_circle_outline;
-    } else if (profil.estEnAttente) {
-      fond = couleurs.secondaryContainer;
-      texte =
-          couleurs.onSecondaryContainer;
-      icon =
-          Icons.hourglass_empty_outlined;
-    } else if (profil.estSuspendu) {
-      fond = couleurs.errorContainer;
-      texte = couleurs.onErrorContainer;
-      icon =
-          Icons.pause_circle_outline;
-    } else {
-      fond =
-          couleurs.surfaceContainerHighest;
-      texte = couleurs.onSurfaceVariant;
-      icon = Icons.block_outlined;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(
-        icon,
-        size: 18,
-        color: texte,
-      ),
-      label: Text(
-        profil.statutFormate,
-        style: TextStyle(
-          color: texte,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 }
@@ -586,6 +542,8 @@ class _ErreurProfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -593,18 +551,16 @@ class _ErreurProfil extends StatelessWidget {
           mainAxisSize:
               MainAxisSize.min,
           children: [
-            Icon(
-              Icons.person_off_outlined,
-              size: 70,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
+            CircleIcon.erreur(
+              context,
+              icon: Icons.person_off_outlined,
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign:
                   TextAlign.center,
+              style: TextStyle(color: scheme.onSurface),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -641,9 +597,9 @@ class _ProfilVide extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 100),
-          const Icon(
-            Icons.person_outline,
-            size: 72,
+          CircleIcon.neutre(
+            context,
+            icon: Icons.person_outline,
           ),
           const SizedBox(height: 16),
           Text(
@@ -651,7 +607,12 @@ class _ProfilVide extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
-                .titleMedium,
+                .titleMedium
+                ?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface,
+                ),
           ),
         ],
       ),

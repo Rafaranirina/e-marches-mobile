@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../utilisateurs/data/utilisateur_gestion.dart';
 import '../../../shared/models/commission.dart';
+import '../../../shared/widgets/circle_icon.dart';
 import 'commission_controller.dart';
 
 class CommissionsPage extends StatelessWidget {
@@ -147,6 +148,68 @@ class _CommissionsViewState
       resultat?.message ??
           controller.errorMessage ??
           'Impossible d’ajouter le membre.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _retirerMembre(
+    Commission commission,
+    MembreCommission membre,
+  ) async {
+    final controller =
+        context.read<CommissionController>();
+
+    final nomMembre = controller.nomMembreParId(
+      membre.utilisateurId,
+    );
+
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text(
+          'Retirer ce membre ?',
+        ),
+        content: Text(
+          'Voulez-vous vraiment retirer $nomMembre de cette commission ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(false);
+            },
+            child: const Text('Annuler'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+            },
+            icon: const Icon(
+              Icons.person_remove_outlined,
+            ),
+            label: const Text('Retirer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirme != true || !mounted) {
+      return;
+    }
+
+    final resultat =
+        await controller.retirerMembre(
+      commissionId: commission.id,
+      utilisateurId: membre.utilisateurId,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de retirer le membre.',
       estErreur: resultat == null,
     );
   }
@@ -318,6 +381,17 @@ class _CommissionsViewState
                 controller.nomMembreParId,
             onAjouterMembre: () =>
                 _ajouterMembre(commission),
+            retraitMembreEnCours:
+                (utilisateurId) =>
+                    controller.retraitMembreEnCours(
+              commission.id,
+              utilisateurId,
+            ),
+            onRetirerMembre: (membre) =>
+                _retirerMembre(
+              commission,
+              membre,
+            ),
           );
         },
       ),
@@ -492,6 +566,8 @@ class _CommissionCard
     required this.ajoutEnCours,
     required this.nomMembreParId,
     required this.onAjouterMembre,
+    required this.retraitMembreEnCours,
+    required this.onRetirerMembre,
   });
 
   final Commission commission;
@@ -502,6 +578,12 @@ class _CommissionCard
       nomMembreParId;
 
   final VoidCallback onAjouterMembre;
+
+  final bool Function(String)
+      retraitMembreEnCours;
+
+  final void Function(MembreCommission)
+      onRetirerMembre;
 
   @override
   Widget build(BuildContext context) {
@@ -569,6 +651,13 @@ class _CommissionCard
                 nomMembre: nomMembreParId(
                   membre.utilisateurId,
                 ),
+                peutGerer: peutGerer,
+                retraitEnCours:
+                    retraitMembreEnCours(
+                  membre.utilisateurId,
+                ),
+                onRetirer: () =>
+                    onRetirerMembre(membre),
               ),
             ),
           if (peutGerer) ...[
@@ -612,10 +701,16 @@ class _MembreCommissionTile
   const _MembreCommissionTile({
     required this.membre,
     required this.nomMembre,
+    required this.peutGerer,
+    required this.retraitEnCours,
+    required this.onRetirer,
   });
 
   final MembreCommission membre;
   final String nomMembre;
+  final bool peutGerer;
+  final bool retraitEnCours;
+  final VoidCallback onRetirer;
 
   @override
   Widget build(BuildContext context) {
@@ -630,6 +725,27 @@ class _MembreCommissionTile
       subtitle: Text(
         membre.fonctionAffichee,
       ),
+      trailing: peutGerer
+          ? IconButton(
+              tooltip: 'Retirer le membre',
+              onPressed: retraitEnCours
+                  ? null
+                  : onRetirer,
+              icon: retraitEnCours
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child:
+                          CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(
+                      Icons
+                          .person_remove_outlined,
+                    ),
+            )
+          : null,
     );
   }
 }
@@ -919,14 +1035,8 @@ class _ErreurCommissions
           mainAxisSize:
               MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 66,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign:
@@ -968,11 +1078,8 @@ class _CommissionsVides
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          const Icon(
-            Icons.groups_outlined,
-            size: 72,
-          ),
-          const SizedBox(height: 16),
+          CircleIcon.neutre(context, icon: Icons.groups_outlined),
+          const SizedBox(height: 20),
           Text(
             'Aucune commission créée pour cet appel d’offres.',
             textAlign: TextAlign.center,

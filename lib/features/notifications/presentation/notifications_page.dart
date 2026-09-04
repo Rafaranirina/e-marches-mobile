@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
 import '../data/notification_utilisateur.dart';
 import 'notification_controller.dart';
 
@@ -697,14 +698,8 @@ class _ErreurNotifications
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -746,15 +741,13 @@ class _NotificationsVides
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          Icon(
-            seulementNonLues
-                ? Icons
-                    .mark_email_read_outlined
-                : Icons
-                    .notifications_none_outlined,
-            size: 72,
+          CircleIcon.neutre(
+            context,
+            icon: seulementNonLues
+                ? Icons.mark_email_read_outlined
+                : Icons.notifications_none_outlined,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             seulementNonLues
                 ? 'Aucune notification non lue.'

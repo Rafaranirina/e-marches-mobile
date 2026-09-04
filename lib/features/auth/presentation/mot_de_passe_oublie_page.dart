@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../data/auth_repository.dart';
+import 'auth_controller.dart';
 import 'reinitialiser_mot_de_passe_page.dart';
 
 class MotDePasseOubliePage extends StatefulWidget {
@@ -14,7 +15,6 @@ class MotDePasseOubliePage extends StatefulWidget {
 class _MotDePasseOubliePageState extends State<MotDePasseOubliePage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _repository = AuthRepository();
 
   bool _isLoading = false;
   bool _messageEnvoye = false;
@@ -36,9 +36,11 @@ class _MotDePasseOubliePageState extends State<MotDePasseOubliePage> {
       _isLoading = true;
     });
 
-    final message = await _repository.demanderReinitialisation(
-      email: _emailController.text,
-    );
+    final message = await context
+        .read<AuthController>()
+        .demanderReinitialisationMotDePasse(
+          email: _emailController.text,
+        );
 
     if (!mounted) {
       return;

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/network/api_client.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/dashboard/presentation/dashboard_page.dart';
+import 'shared/widgets/connectivity_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,8 +42,17 @@ class _EMarchesAppState extends State<EMarchesApp> {
 
     // Si un token est encore stocké depuis un lancement précédent, on
     // revalide la session auprès du serveur plutôt que de forcer une
-    // reconnexion systématique.
-    context.read<AuthController>().restaurerSession();
+    // reconnexion systématique. Différé après la première frame : appeler
+    // notifyListeners() pendant que l'arbre de widgets est encore en train
+    // de se construire (depuis initState) provoque une erreur Flutter
+    // ("Failed assertion: '!_dirty' is not true").
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      context.read<AuthController>().restaurerSession();
+    });
   }
 
   @override
@@ -49,15 +60,14 @@ class _EMarchesAppState extends State<EMarchesApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'e-Marchés Madagascar',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF006B3C),
-        ),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          filled: true,
-        ),
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      builder: (context, child) {
+        return ConnectivityBanner(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: Consumer<AuthController>(
         builder: (context, authController, child) {
           if (authController.isRestoring) {

@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/appel_offre.dart';
 import '../data/appel_offre_repository.dart';
 import 'appel_offre_details_page.dart';
 import 'appel_offre_form_page.dart';
+import 'appel_offre_statut_styles.dart';
 
 class AppelsOffresPage extends StatefulWidget {
   const AppelsOffresPage({super.key});
@@ -295,14 +297,26 @@ class _AppelsOffresPageState extends State<AppelsOffresPage> {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Theme.of(context)
-                .colorScheme
-                .error,
+          Center(
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 40,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onErrorContainer,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             _errorMessage ??
                 'Une erreur est survenue.',
@@ -341,11 +355,26 @@ class _AppelsOffresPageState extends State<AppelsOffresPage> {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          const Icon(
-            Icons.assignment_outlined,
-            size: 72,
+          Center(
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.assignment_outlined,
+                size: 40,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             recherche.isEmpty
                 ? 'Aucun appel d’offres disponible.'
@@ -417,9 +446,9 @@ class _AppelOffreCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  _StatutBadge(
-                    statut:
-                        appelOffre.statut,
+                  StatutChip(
+                    statut: appelOffre.statut,
+                    styles: appelOffreStatutStyles,
                   ),
                 ],
               ),
@@ -567,111 +596,6 @@ class _InformationLigne extends StatelessWidget {
   }
 }
 
-class _StatutBadge extends StatelessWidget {
-  const _StatutBadge({
-    required this.statut,
-  });
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleurs =
-        _couleursStatut(context, statut);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
-        color: couleurs.background,
-        borderRadius:
-            BorderRadius.circular(20),
-      ),
-      child: Text(
-        _libelleStatut(statut),
-        style: Theme.of(context)
-            .textTheme
-            .labelMedium
-            ?.copyWith(
-              color: couleurs.foreground,
-              fontWeight: FontWeight.bold,
-            ),
-      ),
-    );
-  }
-
-  static _CouleursStatut _couleursStatut(
-    BuildContext context,
-    String statut,
-  ) {
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    switch (statut.toLowerCase()) {
-      case 'publie':
-        return _CouleursStatut(
-          background:
-              couleurs.primaryContainer,
-          foreground:
-              couleurs.onPrimaryContainer,
-        );
-
-      case 'brouillon':
-        return _CouleursStatut(
-          background:
-              couleurs.secondaryContainer,
-          foreground:
-              couleurs.onSecondaryContainer,
-        );
-
-      case 'en_evaluation':
-        return _CouleursStatut(
-          background:
-              couleurs.tertiaryContainer,
-          foreground:
-              couleurs.onTertiaryContainer,
-        );
-
-      case 'attribue':
-        return _CouleursStatut(
-          background:
-              couleurs.primaryContainer,
-          foreground:
-              couleurs.onPrimaryContainer,
-        );
-
-      case 'infructueux':
-      case 'annule':
-        return _CouleursStatut(
-          background:
-              couleurs.errorContainer,
-          foreground:
-              couleurs.onErrorContainer,
-        );
-
-      default:
-        return _CouleursStatut(
-          background:
-              couleurs.surfaceContainerHighest,
-          foreground:
-              couleurs.onSurfaceVariant,
-        );
-    }
-  }
-}
-
-class _CouleursStatut {
-  const _CouleursStatut({
-    required this.background,
-    required this.foreground,
-  });
-
-  final Color background;
-  final Color foreground;
-}
-
 String _libelleTypeMarche(String type) {
   switch (type.toLowerCase()) {
     case 'travaux':
@@ -694,34 +618,6 @@ String _libelleTypeMarche(String type) {
 
     default:
       return type;
-  }
-}
-
-String _libelleStatut(String statut) {
-  switch (statut.toLowerCase()) {
-    case 'brouillon':
-      return 'Brouillon';
-
-    case 'publie':
-      return 'Publié';
-
-    case 'cloture':
-      return 'Clôturé';
-
-    case 'en_evaluation':
-      return 'En évaluation';
-
-    case 'attribue':
-      return 'Attribué';
-
-    case 'infructueux':
-      return 'Infructueux';
-
-    case 'annule':
-      return 'Annulé';
-
-    default:
-      return statut;
   }
 }
 

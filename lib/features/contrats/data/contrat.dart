@@ -16,6 +16,9 @@ class Contrat {
     this.administrationId,
     this.soumissionId,
     this.dateCreation,
+    this.avancement = 0,
+    this.archive = false,
+    this.dateArchivage,
   });
 
   final String id;
@@ -24,10 +27,14 @@ class Contrat {
   final double? montant;
   final String statut;
 
+  final int avancement;
+  final bool archive;
+
   final DateTime? dateSignature;
   final DateTime? dateDebut;
   final DateTime? dateFin;
   final DateTime? dateCreation;
+  final DateTime? dateArchivage;
 
   final String? entreprise;
   final String? administration;
@@ -85,6 +92,16 @@ class Contrat {
       ),
       soumissionId: _nullableString(
         json['soumission_id'],
+      ),
+      avancement: _parseInt(
+            json['avancement'],
+          ) ??
+          0,
+      archive: _parseBool(
+        json['archive'],
+      ),
+      dateArchivage: _parseDate(
+        json['date_archivage'],
       ),
     );
   }
@@ -152,5 +169,53 @@ class Contrat {
     }
 
     return DateTime.tryParse(texte);
+  }
+
+  static int? _parseInt(
+    dynamic value,
+  ) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    final texte = value.toString().trim();
+
+    if (texte.isEmpty) {
+      return null;
+    }
+
+    return int.tryParse(texte) ??
+        double.tryParse(texte)?.toInt();
+  }
+
+  static bool _parseBool(
+    dynamic value,
+  ) {
+    if (value == null) {
+      return false;
+    }
+
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    final texte =
+        value.toString().trim().toLowerCase();
+
+    return texte == 'true' ||
+        texte == '1' ||
+        texte == 'oui';
   }
 }

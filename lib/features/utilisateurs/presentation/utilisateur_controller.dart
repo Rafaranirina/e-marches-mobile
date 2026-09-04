@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/utilisateur_gestion.dart';
 import '../data/utilisateur_repository.dart';
 
-class UtilisateurController extends ChangeNotifier {
+class UtilisateurController extends SafeChangeNotifier {
   UtilisateurController({
     UtilisateurRepository? repository,
   }) : _repository =

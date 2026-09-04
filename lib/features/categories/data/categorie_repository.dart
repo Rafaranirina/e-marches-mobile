@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'categorie_marche.dart';
 
 class CategorieRepository {
@@ -40,6 +41,83 @@ class CategorieRepository {
     }
   }
 
+  Future<ListeCategoriesResult>
+      listerGestion() async {
+    try {
+      final response = await _dio.get(
+        '/api/categories/gestion',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ListeCategoriesResult.fromJson(
+        data,
+      );
+    } on DioException catch (error) {
+      throw CategorieException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger les catégories.',
+        ),
+      );
+    } on CategorieException {
+      rethrow;
+    } catch (_) {
+      throw const CategorieException(
+        'La liste des catégories reçue est invalide.',
+      );
+    }
+  }
+
+  Future<CategorieMarche> obtenirCategorie(
+    String categorieId,
+  ) async {
+    final id = categorieId.trim();
+
+    if (id.isEmpty) {
+      throw const CategorieException(
+        'La catégorie sélectionnée est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.get(
+        '/api/categories/$id',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      final categorie =
+          _extraireCategorie(data);
+
+      if (categorie == null ||
+          categorie.id.isEmpty) {
+        throw const CategorieException(
+          'La catégorie reçue est invalide.',
+        );
+      }
+
+      return categorie;
+    } on DioException catch (error) {
+      throw CategorieException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger la catégorie.',
+        ),
+      );
+    } on CategorieException {
+      rethrow;
+    } catch (_) {
+      throw const CategorieException(
+        'La catégorie reçue est invalide.',
+      );
+    }
+  }
+
   Future<ActionCategorieResult>
       creerCategorie(
     DonneesCategorie donnees,
@@ -56,26 +134,13 @@ class CategorieRepository {
         response.data,
       );
 
-      final categorieData =
-          data['categorie'];
-
-      CategorieMarche? categorie;
-
-      if (categorieData is Map) {
-        categorie =
-            CategorieMarche.fromJson(
-          Map<String, dynamic>.from(
-            categorieData,
-          ),
-        );
-      }
-
       return ActionCategorieResult(
         message: _extraireMessageReponse(
           data,
           'Catégorie créée avec succès.',
         ),
-        categorie: categorie,
+        categorie:
+            _extraireCategorie(data),
       );
     } on DioException catch (error) {
       throw CategorieException(
@@ -93,9 +158,113 @@ class CategorieRepository {
     }
   }
 
+  Future<ActionCategorieResult>
+      modifierCategorie({
+    required String categorieId,
+    required DonneesCategorie donnees,
+  }) async {
+    final id = categorieId.trim();
+
+    if (id.isEmpty) {
+      throw const CategorieException(
+        'La catégorie sélectionnée est invalide.',
+      );
+    }
+
+    _validerDonnees(
+      donnees,
+      categorieId: id,
+    );
+
+    try {
+      final response = await _dio.put(
+        '/api/categories/$id',
+        data: donnees.versJson(),
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ActionCategorieResult(
+        message: _extraireMessageReponse(
+          data,
+          'Catégorie modifiée avec succès.',
+        ),
+        categorie:
+            _extraireCategorie(data),
+      );
+    } on DioException catch (error) {
+      throw CategorieException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de modifier la catégorie.',
+        ),
+      );
+    } on CategorieException {
+      rethrow;
+    } catch (_) {
+      throw const CategorieException(
+        'La réponse du serveur est invalide.',
+      );
+    }
+  }
+
+  Future<ActionCategorieResult>
+      changerStatut({
+    required String categorieId,
+    required bool actif,
+  }) async {
+    final id = categorieId.trim();
+
+    if (id.isEmpty) {
+      throw const CategorieException(
+        'La catégorie sélectionnée est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/categories/$id/statut',
+        data: {
+          'actif': actif,
+        },
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ActionCategorieResult(
+        message: _extraireMessageReponse(
+          data,
+          actif
+              ? 'Catégorie activée avec succès.'
+              : 'Catégorie désactivée avec succès.',
+        ),
+        categorie:
+            _extraireCategorie(data),
+      );
+    } on DioException catch (error) {
+      throw CategorieException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de modifier le statut de la catégorie.',
+        ),
+      );
+    } on CategorieException {
+      rethrow;
+    } catch (_) {
+      throw const CategorieException(
+        'La réponse du serveur est invalide.',
+      );
+    }
+  }
+
   void _validerDonnees(
-    DonneesCategorie donnees,
-  ) {
+    DonneesCategorie donnees, {
+    String? categorieId,
+  }) {
     if (donnees.nom.trim().isEmpty) {
       throw const CategorieException(
         'Le nom de la catégorie est obligatoire.',
@@ -112,6 +281,32 @@ class CategorieRepository {
         'La catégorie parente est invalide.',
       );
     }
+
+    if (parentId != null &&
+        parentId.isNotEmpty &&
+        categorieId != null &&
+        parentId == categorieId.trim()) {
+      throw const CategorieException(
+        'Une catégorie ne peut pas être sa propre catégorie parente.',
+      );
+    }
+  }
+
+  CategorieMarche? _extraireCategorie(
+    Map<String, dynamic> data,
+  ) {
+    final categorieData =
+        data['categorie'];
+
+    if (categorieData is! Map) {
+      return null;
+    }
+
+    return CategorieMarche.fromJson(
+      Map<String, dynamic>.from(
+        categorieData,
+      ),
+    );
   }
 
   Map<String, dynamic> _convertirMap(
@@ -144,54 +339,16 @@ class CategorieRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à créer une catégorie.';
-
-      case 409:
-        return 'Cette catégorie existe déjà.';
-
-      case 500:
-        return 'Une erreur interne est survenue sur le serveur.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        403: 'Vous n’êtes pas autorisé à gérer les catégories.',
+        404: 'La catégorie est introuvable.',
+        409: 'Cette catégorie existe déjà.',
+      },
+    );
   }
 }
 

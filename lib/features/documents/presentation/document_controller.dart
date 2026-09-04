@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/document_marche.dart';
 import '../data/document_repository.dart';
 
-class DocumentController extends ChangeNotifier {
+class DocumentController extends SafeChangeNotifier {
   DocumentController({
     required this.contexte,
     required this.contexteId,
@@ -20,6 +20,7 @@ class DocumentController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isUploading = false;
   bool _isGeneratingLink = false;
+  bool _isUploadingVersion = false;
 
   String? _errorMessage;
 
@@ -33,10 +34,14 @@ class DocumentController extends ChangeNotifier {
   bool get isGeneratingLink =>
       _isGeneratingLink;
 
+  bool get isUploadingVersion =>
+      _isUploadingVersion;
+
   bool get isBusy =>
       _isLoading ||
       _isUploading ||
-      _isGeneratingLink;
+      _isGeneratingLink ||
+      _isUploadingVersion;
 
   String? get errorMessage =>
       _errorMessage;
@@ -148,6 +153,92 @@ class DocumentController extends ChangeNotifier {
     } finally {
       _isUploading = false;
       notifyListeners();
+    }
+  }
+
+  Future<UploadDocumentResult?> televerserNouvelleVersion({
+    required String documentId,
+    required String cheminFichier,
+    String? commentaireVersion,
+  }) async {
+    if (!_contexteValide()) {
+      _errorMessage =
+          'Le contexte des documents est invalide.';
+      notifyListeners();
+      return null;
+    }
+
+    if (documentId.trim().isEmpty) {
+      _errorMessage =
+          'Le document sélectionné est invalide.';
+      notifyListeners();
+      return null;
+    }
+
+    if (cheminFichier.trim().isEmpty) {
+      _errorMessage =
+          'Sélectionnez un fichier.';
+      notifyListeners();
+      return null;
+    }
+
+    _isUploadingVersion = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat = await _repository
+          .televerserNouvelleVersion(
+        documentId: documentId.trim(),
+        cheminFichier:
+            cheminFichier.trim(),
+        commentaireVersion:
+            commentaireVersion,
+      );
+
+      _documents =
+          await _repository.lister(
+        contexte: contexte,
+        contexteId: contexteId,
+      );
+
+      return resultat;
+    } on DocumentException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de téléverser la nouvelle version.';
+      return null;
+    } finally {
+      _isUploadingVersion = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<DocumentVersion>?> obtenirHistorique(
+    String documentId,
+  ) async {
+    if (documentId.trim().isEmpty) {
+      _errorMessage =
+          'Le document sélectionné est invalide.';
+      notifyListeners();
+      return null;
+    }
+
+    try {
+      return await _repository.obtenirHistorique(
+        documentId.trim(),
+      );
+    } on DocumentException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de récupérer l’historique des versions.';
+      notifyListeners();
+      return null;
     }
   }
 

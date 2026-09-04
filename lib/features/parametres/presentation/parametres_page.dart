@@ -1,11 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'parametres_controller.dart';
+
+// Le backend limite la photo de profil à 5 Mo
+// (photoProfil.middleware.js) — on le vérifie côté client pour éviter un
+// aller-retour réseau inutile en cas de fichier trop volumineux.
+const int _tailleMaxPhotoOctets = 5 * 1024 * 1024;
 
 class ParametresPage extends StatelessWidget {
   const ParametresPage({super.key});
@@ -80,13 +87,71 @@ class _ParametresViewState extends State<_ParametresView> {
   }
 
   Future<void> _changerPhoto() async {
-    final resultat = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Prendre une photo'),
+                onTap: () => Navigator.of(sheetContext).pop(
+                  ImageSource.camera,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choisir depuis la galerie'),
+                onTap: () => Navigator.of(sheetContext).pop(
+                  ImageSource.gallery,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
 
-    final chemin = resultat?.files.single.path;
+    if (source == null || !mounted) {
+      return;
+    }
+
+    final String? chemin;
+
+    if (source == ImageSource.camera) {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+
+      chemin = photo?.path;
+    } else {
+      final resultat = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+      );
+
+      chemin = resultat?.files.single.path;
+    }
 
     if (chemin == null || !mounted) {
+      return;
+    }
+
+    final taille = await File(chemin).length();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (taille > _tailleMaxPhotoOctets) {
+      _afficherMessage(
+        'Cette image dépasse la taille maximale autorisée (5 Mo). '
+        'Choisissez une image plus légère.',
+        estErreur: true,
+      );
       return;
     }
 
@@ -169,12 +234,15 @@ class _ParametresViewState extends State<_ParametresView> {
     );
 
     if (confirmer != true || !mounted) {
+      motDePasseController.dispose();
       return;
     }
 
     final controller = context.read<ParametresController>();
     final message =
         await controller.desactiver2FA(motDePasseController.text);
+
+    motDePasseController.dispose();
 
     if (!mounted) {
       return;

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'document_marche.dart';
 
 class DocumentRepository {
@@ -176,6 +177,156 @@ class DocumentRepository {
     }
   }
 
+  Future<UploadDocumentResult> televerserNouvelleVersion({
+    required String documentId,
+    required String cheminFichier,
+    String? commentaireVersion,
+  }) async {
+    final documentIdNormalise =
+        documentId.trim();
+
+    final cheminNormalise =
+        cheminFichier.trim();
+
+    if (documentIdNormalise.isEmpty) {
+      throw const DocumentException(
+        'Le document à remplacer est invalide.',
+      );
+    }
+
+    if (cheminNormalise.isEmpty) {
+      throw const DocumentException(
+        'Sélectionnez un fichier.',
+      );
+    }
+
+    final nomFichier = cheminNormalise
+        .split(RegExp(r'[\\/]'))
+        .last
+        .trim();
+
+    if (nomFichier.isEmpty) {
+      throw const DocumentException(
+        'Le nom du fichier est invalide.',
+      );
+    }
+
+    try {
+      final fichier =
+          await MultipartFile.fromFile(
+        cheminNormalise,
+        filename: nomFichier,
+      );
+
+      final donnees = <String, dynamic>{
+        'fichier': fichier,
+        'commentaire_version':
+            _nullableString(commentaireVersion),
+      };
+
+      final response = await _dio.post(
+        '/api/documents/'
+        '$documentIdNormalise/nouvelle-version',
+        data: FormData.fromMap(donnees),
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final documentData =
+          data['document'];
+
+      DocumentMarche? document;
+
+      if (documentData is Map) {
+        document = DocumentMarche.fromJson(
+          Map<String, dynamic>.from(
+            documentData,
+          ),
+        );
+      }
+
+      return UploadDocumentResult(
+        message: _extraireMessageReponse(
+          data,
+          'Nouvelle version téléversée avec succès.',
+        ),
+        document: document,
+      );
+    } on DocumentException {
+      rethrow;
+    } on DioException catch (error) {
+      throw DocumentException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de téléverser la nouvelle version.',
+        ),
+      );
+    } catch (_) {
+      throw const DocumentException(
+        'Impossible de lire ou de téléverser le fichier.',
+      );
+    }
+  }
+
+  Future<List<DocumentVersion>> obtenirHistorique(
+    String documentId,
+  ) async {
+    final documentIdNormalise =
+        documentId.trim();
+
+    if (documentIdNormalise.isEmpty) {
+      throw const DocumentException(
+        'L’identifiant du document est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.get(
+        '/api/documents/'
+        '$documentIdNormalise/historique',
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final liste = data['versions'];
+
+      if (liste is! List) {
+        throw const DocumentException(
+          'L’historique des versions est invalide.',
+        );
+      }
+
+      return liste
+          .whereType<Map>()
+          .map(
+            (item) => DocumentVersion.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .where(
+            (version) => version.id.isNotEmpty,
+          )
+          .toList();
+    } on DocumentException {
+      rethrow;
+    } on DioException catch (error) {
+      throw DocumentException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de récupérer l’historique des versions.',
+        ),
+      );
+    } catch (_) {
+      throw const DocumentException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
   Future<TelechargementDocumentResult>
       obtenirLienTelechargement(
     String documentId,
@@ -309,54 +460,15 @@ class DocumentRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations ou le fichier transmis sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à effectuer cette action.';
-
-      case 404:
-        return 'Le document est introuvable.';
-
-      case 413:
-        return 'Le fichier sélectionné est trop volumineux.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations ou le fichier transmis sont invalides.',
+        404: 'Le document est introuvable.',
+        413: 'Le fichier sélectionné est trop volumineux.',
+      },
+    );
   }
 
   static String? _nullableString(

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'utilisateur_gestion.dart';
 
 class UtilisateurRepository {
@@ -9,6 +10,29 @@ class UtilisateurRepository {
   }) : _dio = dio ?? ApiClient.dio;
 
   final Dio _dio;
+
+  // Profil de l'utilisateur connecté, partagé en mémoire entre les écrans
+  // Profil et Paramètres (tous deux affichent les mêmes informations) pour
+  // éviter deux appels GET /api/users/profil indépendants lors d'une même
+  // session — voir chargerProfil().
+  static UtilisateurGestion? _profilEnCache;
+
+  /// À appeler après une mutation qui invalide le cache ailleurs que via
+  /// [chargerProfil] (ex. déconnexion), pour forcer un prochain appel à
+  /// revenir chercher les données sur le serveur.
+  static void invaliderProfilEnCache() {
+    _profilEnCache = null;
+  }
+
+  /// À appeler après une mutation du profil obtenue par un autre appel que
+  /// [chargerProfil] (ex. modification du profil, activation de la 2FA),
+  /// pour que le cache reste synchronisé avec les données les plus
+  /// récentes.
+  static void definirProfilEnCache(
+    UtilisateurGestion profil,
+  ) {
+    _profilEnCache = profil;
+  }
 
   Future<ListeUtilisateursResult>
       listerUtilisateurs() async {
@@ -40,8 +64,15 @@ class UtilisateurRepository {
     }
   }
 
-  Future<UtilisateurGestion>
-      chargerProfil() async {
+  Future<UtilisateurGestion> chargerProfil({
+    bool forcerActualisation = false,
+  }) async {
+    final enCache = _profilEnCache;
+
+    if (!forcerActualisation && enCache != null) {
+      return enCache;
+    }
+
     try {
       final response = await _dio.get(
         '/api/users/profil',
@@ -73,6 +104,8 @@ class UtilisateurRepository {
           'Le profil reçu est incomplet.',
         );
       }
+
+      _profilEnCache = utilisateur;
 
       return utilisateur;
     } on DioException catch (error) {
@@ -420,54 +453,16 @@ class UtilisateurRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à gérer les utilisateurs.';
-
-      case 404:
-        return 'L’utilisateur est introuvable.';
-
-      case 409:
-        return 'Cette adresse e-mail est déjà utilisée.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        403: 'Vous n’êtes pas autorisé à gérer les utilisateurs.',
+        404: 'L’utilisateur est introuvable.',
+        409: 'Cette adresse e-mail est déjà utilisée.',
+      },
+    );
   }
 }
 

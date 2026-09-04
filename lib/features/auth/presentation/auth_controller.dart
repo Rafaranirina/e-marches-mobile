@@ -1,10 +1,13 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
+import '../../utilisateurs/data/utilisateur_repository.dart';
 import '../data/auth_repository.dart';
 import '../data/auth_user.dart';
 import '../data/login_result.dart';
 
-class AuthController extends ChangeNotifier {
+export '../data/auth_repository.dart' show AuthActionResult;
+
+class AuthController extends SafeChangeNotifier {
   AuthController({
     AuthRepository? repository,
   }) : _repository = repository ?? AuthRepository();
@@ -13,7 +16,11 @@ class AuthController extends ChangeNotifier {
 
   AuthUser? _utilisateur;
   bool _isLoading = false;
-  bool _isRestoring = false;
+  // Démarre à `true` (plutôt que d'être mis à `true` puis notifié depuis
+  // restaurerSession()) pour que le tout premier build affiche déjà l'état
+  // de chargement sans notification synchrone pendant initState — voir
+  // restaurerSession() et le postFrameCallback dans main.dart.
+  bool _isRestoring = true;
   String? _errorMessage;
   String? _utilisateurDeuxFacteursId;
   String? _challenge2fa;
@@ -101,13 +108,53 @@ class AuthController extends ChangeNotifier {
     return result;
   }
 
+  /// Annule un flux de double authentification en cours (ex. l'utilisateur
+  /// revient à l'écran de connexion depuis l'écran de vérification du code)
+  /// pour éviter qu'un challenge périmé reste en mémoire.
+  void annulerDeuxFacteurs() {
+    _utilisateurDeuxFacteursId = null;
+    _challenge2fa = null;
+    notifyListeners();
+  }
+
+  Future<String> demanderReinitialisationMotDePasse({
+    required String email,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final message = await _repository.demanderReinitialisation(
+      email: email,
+    );
+
+    _isLoading = false;
+    notifyListeners();
+
+    return message;
+  }
+
+  Future<AuthActionResult> reinitialiserMotDePasse({
+    required String token,
+    required String nouveauMotDePasse,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final resultat = await _repository.reinitialiserMotDePasse(
+      token: token,
+      nouveauMotDePasse: nouveauMotDePasse,
+    );
+
+    _isLoading = false;
+    notifyListeners();
+
+    return resultat;
+  }
+
   /// À appeler une fois au démarrage de l'app : si un token est encore
   /// stocké, revalide la session auprès du serveur pour éviter de forcer
   /// une reconnexion alors que le token est toujours valide.
   Future<void> restaurerSession() async {
-    _isRestoring = true;
-    notifyListeners();
-
     try {
       _utilisateur =
           await _repository.restaurerUtilisateurConnecte();
@@ -119,6 +166,8 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     await _repository.logout();
+
+    UtilisateurRepository.invaliderProfilEnCache();
 
     _utilisateur = null;
     _errorMessage = null;

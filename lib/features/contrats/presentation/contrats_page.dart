@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../data/contrat.dart';
 import 'contrat_controller.dart';
+import 'contrat_statut_styles.dart';
 import 'contrat_details_page.dart';
 
 class ContratsPage extends StatelessWidget {
@@ -581,9 +584,9 @@ class _ContratCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _StatutContratChip(
-                    statut:
-                        contrat.statut,
+                  StatutChip(
+                    statut: contrat.statut,
+                    styles: contratStatutStyles,
                   ),
                 ],
               ),
@@ -693,102 +696,6 @@ class _InformationContrat
   }
 }
 
-class _StatutContratChip
-    extends StatelessWidget {
-  const _StatutContratChip({
-    required this.statut,
-  });
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final String texte;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'en_cours':
-        texte = 'En cours';
-        fond =
-            couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone =
-            Icons.play_circle_outline;
-        break;
-
-      case 'suspendu':
-        texte = 'Suspendu';
-        fond =
-            couleurs.secondaryContainer;
-        premierPlan =
-            couleurs.onSecondaryContainer;
-        icone =
-            Icons.pause_circle_outline;
-        break;
-
-      case 'termine':
-        texte = 'Terminé';
-        fond =
-            couleurs.tertiaryContainer;
-        premierPlan =
-            couleurs.onTertiaryContainer;
-        icone =
-            Icons.check_circle_outline;
-        break;
-
-      case 'resilie':
-        texte = 'Résilié';
-        fond =
-            couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone =
-            Icons.cancel_outlined;
-        break;
-
-      default:
-        texte = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut.replaceAll('_', ' ');
-
-        fond =
-            couleurs.surfaceContainerHighest;
-
-        premierPlan =
-            couleurs.onSurfaceVariant;
-
-        icone =
-            Icons.info_outline;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(
-        icone,
-        size: 17,
-        color: premierPlan,
-      ),
-      label: Text(
-        texte,
-        style: TextStyle(
-          color: premierPlan,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
 class _ErreurContrats extends StatelessWidget {
   const _ErreurContrats({
     required this.message,
@@ -806,14 +713,8 @@ class _ErreurContrats extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -855,11 +756,8 @@ class _ListeContratsVide
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 70),
-          const Icon(
-            Icons.description_outlined,
-            size: 72,
-          ),
-          const SizedBox(height: 16),
+          CircleIcon.neutre(context, icon: Icons.description_outlined),
+          const SizedBox(height: 20),
           Text(
             message,
             textAlign: TextAlign.center,

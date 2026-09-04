@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../../administrations/data/administration_marche.dart';
 import '../../administrations/data/administration_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../fournisseurs/data/fournisseur.dart';
 import '../../fournisseurs/data/fournisseur_repository.dart';
 import '../data/utilisateur_gestion.dart';
+import 'utilisateur_statut_styles.dart';
 import 'utilisateur_controller.dart';
 
 class UtilisateursPage extends StatelessWidget {
@@ -936,8 +939,9 @@ class _UtilisateurCard extends StatelessWidget {
                     utilisateur.roleFormate,
                   ),
                 ),
-                _StatutUtilisateurChip(
-                  utilisateur: utilisateur,
+                StatutChip(
+                  statut: utilisateur.statut,
+                  styles: utilisateurStatutStyles,
                 ),
                 if (utilisateur
                     .doubleAuthActive)
@@ -1072,64 +1076,6 @@ class _DetailUtilisateur
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatutUtilisateurChip
-    extends StatelessWidget {
-  const _StatutUtilisateurChip({
-    required this.utilisateur,
-  });
-
-  final UtilisateurGestion utilisateur;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final Color fond;
-    final Color texte;
-    final IconData icon;
-
-    if (utilisateur.estActif) {
-      fond = couleurs.primaryContainer;
-      texte = couleurs.onPrimaryContainer;
-      icon = Icons.check_circle_outline;
-    } else if (utilisateur.estEnAttente) {
-      fond = couleurs.secondaryContainer;
-      texte =
-          couleurs.onSecondaryContainer;
-      icon =
-          Icons.hourglass_empty_outlined;
-    } else if (utilisateur.estSuspendu) {
-      fond = couleurs.errorContainer;
-      texte = couleurs.onErrorContainer;
-      icon =
-          Icons.pause_circle_outline;
-    } else {
-      fond =
-          couleurs.surfaceContainerHighest;
-      texte = couleurs.onSurfaceVariant;
-      icon = Icons.block_outlined;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(
-        icon,
-        size: 17,
-        color: texte,
-      ),
-      label: Text(
-        utilisateur.statutFormate,
-        style: TextStyle(
-          color: texte,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 }
@@ -2027,14 +1973,8 @@ class _ErreurUtilisateurs
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -2076,15 +2016,13 @@ class _UtilisateursVides
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 70),
-          Icon(
-            filtreActif
-                ? Icons
-                    .person_search_outlined
-                : Icons
-                    .manage_accounts_outlined,
-            size: 72,
+          CircleIcon.neutre(
+            context,
+            icon: filtreActif
+                ? Icons.person_search_outlined
+                : Icons.manage_accounts_outlined,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             filtreActif
                 ? 'Aucun utilisateur ne correspond aux filtres.'

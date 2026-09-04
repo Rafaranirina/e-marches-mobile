@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'contrat.dart';
+import 'jalon_contrat.dart';
 import 'paiement.dart';
 
 class ContratRepository {
@@ -104,6 +106,22 @@ class ContratRepository {
               .toList()
           : <Paiement>[];
 
+      final jalonsData = data['jalons'];
+
+      final jalons = jalonsData is List
+          ? jalonsData
+              .whereType<Map>()
+              .map(
+                (item) => JalonContrat.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .where(
+                (jalon) => jalon.id.isNotEmpty,
+              )
+              .toList()
+          : <JalonContrat>[];
+
       return ContratDetailsResult(
         contrat: Contrat.fromJson(
           Map<String, dynamic>.from(
@@ -111,6 +129,7 @@ class ContratRepository {
           ),
         ),
         paiements: paiements,
+        jalons: jalons,
       );
     } on ContratException {
       rethrow;
@@ -340,6 +359,439 @@ class ContratRepository {
     }
   }
 
+  Future<List<JalonContrat>> listerJalons(
+    String contratId,
+  ) async {
+    final contratIdNormalise =
+        contratId.trim();
+
+    if (contratIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du contrat est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.get(
+        '/api/contrats/$contratIdNormalise/jalons',
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final liste = data['jalons'];
+
+      if (liste is! List) {
+        throw const ContratException(
+          'La liste des jalons est invalide.',
+        );
+      }
+
+      return liste
+          .whereType<Map>()
+          .map(
+            (item) => JalonContrat.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .where(
+            (jalon) => jalon.id.isNotEmpty,
+          )
+          .toList();
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de récupérer les jalons.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<JalonActionResult> creerJalon({
+    required String contratId,
+    required String titre,
+    String? description,
+    int? ordre,
+    DateTime? datePrevue,
+  }) async {
+    final contratIdNormalise =
+        contratId.trim();
+
+    if (contratIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du contrat est invalide.',
+      );
+    }
+
+    final titreNormalise = titre.trim();
+
+    if (titreNormalise.isEmpty) {
+      throw const ContratException(
+        'Le titre du jalon est obligatoire.',
+      );
+    }
+
+    try {
+      final response = await _dio.post(
+        '/api/contrats/$contratIdNormalise/jalons',
+        data: {
+          'titre': titreNormalise,
+          'description':
+              _nullableString(description),
+          'ordre': ?ordre,
+          'date_prevue':
+              _formatDateApi(datePrevue),
+        },
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final jalonData = data['jalon'];
+
+      return JalonActionResult(
+        message: _extraireMessageReponse(
+          data,
+          'Jalon créé.',
+        ),
+        jalon: jalonData is Map
+            ? JalonContrat.fromJson(
+                Map<String, dynamic>.from(
+                  jalonData,
+                ),
+              )
+            : null,
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de créer le jalon.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<JalonActionResult> modifierJalon({
+    required String jalonId,
+    String? titre,
+    String? description,
+    String? statut,
+    DateTime? datePrevue,
+    DateTime? dateReelle,
+  }) async {
+    final jalonIdNormalise = jalonId.trim();
+
+    if (jalonIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du jalon est invalide.',
+      );
+    }
+
+    final titreNormalise = titre?.trim();
+
+    if (titreNormalise != null &&
+        titreNormalise.isEmpty) {
+      throw const ContratException(
+        'Le titre du jalon est obligatoire.',
+      );
+    }
+
+    final statutNormalise =
+        statut?.trim().toLowerCase();
+
+    const statutsAutorises = {
+      'a_venir',
+      'en_cours',
+      'termine',
+      'retard',
+    };
+
+    if (statutNormalise != null &&
+        statutNormalise.isNotEmpty &&
+        !statutsAutorises.contains(
+          statutNormalise,
+        )) {
+      throw const ContratException(
+        'Le statut du jalon est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/contrats/jalons/$jalonIdNormalise',
+        data: {
+          'titre': _nullableString(
+            titreNormalise,
+          ),
+          'description':
+              _nullableString(description),
+          'statut':
+              _nullableString(statutNormalise),
+          'date_prevue':
+              _formatDateApi(datePrevue),
+          'date_reelle':
+              _formatDateApi(dateReelle),
+        },
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final jalonData = data['jalon'];
+
+      return JalonActionResult(
+        message: _extraireMessageReponse(
+          data,
+          'Jalon mis à jour.',
+        ),
+        jalon: jalonData is Map
+            ? JalonContrat.fromJson(
+                Map<String, dynamic>.from(
+                  jalonData,
+                ),
+              )
+            : null,
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de mettre à jour le jalon.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<String> supprimerJalon(
+    String jalonId,
+  ) async {
+    final jalonIdNormalise = jalonId.trim();
+
+    if (jalonIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du jalon est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.delete(
+        '/api/contrats/jalons/$jalonIdNormalise',
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      return _extraireMessageReponse(
+        data,
+        'Jalon supprimé.',
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de supprimer le jalon.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<ContratActionResult>
+      mettreAJourAvancement({
+    required String contratId,
+    required int avancement,
+  }) async {
+    final contratIdNormalise =
+        contratId.trim();
+
+    if (contratIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du contrat est invalide.',
+      );
+    }
+
+    if (avancement < 0 || avancement > 100) {
+      throw const ContratException(
+        'L’avancement doit être un nombre entier entre 0 et 100.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/contrats/$contratIdNormalise/avancement',
+        data: {
+          'avancement': avancement,
+        },
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final contratData = data['contrat'];
+
+      return ContratActionResult(
+        message: _extraireMessageReponse(
+          data,
+          'Avancement mis à jour.',
+        ),
+        contrat: contratData is Map
+            ? Contrat.fromJson(
+                Map<String, dynamic>.from(
+                  contratData,
+                ),
+              )
+            : null,
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de mettre à jour l’avancement.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<ContratActionResult> archiver(
+    String contratId,
+  ) async {
+    final contratIdNormalise =
+        contratId.trim();
+
+    if (contratIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du contrat est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/contrats/$contratIdNormalise/archiver',
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final contratData = data['contrat'];
+
+      return ContratActionResult(
+        message: _extraireMessageReponse(
+          data,
+          'Contrat archivé.',
+        ),
+        contrat: contratData is Map
+            ? Contrat.fromJson(
+                Map<String, dynamic>.from(
+                  contratData,
+                ),
+              )
+            : null,
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible d’archiver le contrat.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
+  Future<ContratActionResult> desarchiver(
+    String contratId,
+  ) async {
+    final contratIdNormalise =
+        contratId.trim();
+
+    if (contratIdNormalise.isEmpty) {
+      throw const ContratException(
+        'L’identifiant du contrat est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/contrats/$contratIdNormalise/desarchiver',
+      );
+
+      final data = _convertirReponse(
+        response.data,
+      );
+
+      final contratData = data['contrat'];
+
+      return ContratActionResult(
+        message: _extraireMessageReponse(
+          data,
+          'Contrat désarchivé.',
+        ),
+        contrat: contratData is Map
+            ? Contrat.fromJson(
+                Map<String, dynamic>.from(
+                  contratData,
+                ),
+              )
+            : null,
+      );
+    } on ContratException {
+      rethrow;
+    } on DioException catch (error) {
+      throw ContratException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de désarchiver le contrat.',
+        ),
+      );
+    } catch (_) {
+      throw const ContratException(
+        'Une erreur inattendue est survenue.',
+      );
+    }
+  }
+
   Map<String, dynamic> _convertirReponse(
     dynamic responseData,
   ) {
@@ -370,54 +822,15 @@ class ContratRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à effectuer cette action.';
-
-      case 404:
-        return 'Le contrat ou le paiement est introuvable.';
-
-      case 409:
-        return 'Cette opération a déjà été effectuée.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        404: 'Le contrat ou le paiement est introuvable.',
+        409: 'Cette opération a déjà été effectuée.',
+      },
+    );
   }
 
   static String? _nullableString(
@@ -455,10 +868,12 @@ class ContratDetailsResult {
   const ContratDetailsResult({
     required this.contrat,
     required this.paiements,
+    this.jalons = const [],
   });
 
   final Contrat contrat;
   final List<Paiement> paiements;
+  final List<JalonContrat> jalons;
 }
 
 class ContratActionResult {
@@ -479,6 +894,16 @@ class PaiementActionResult {
 
   final String message;
   final Paiement? paiement;
+}
+
+class JalonActionResult {
+  const JalonActionResult({
+    required this.message,
+    this.jalon,
+  });
+
+  final String message;
+  final JalonContrat? jalon;
 }
 
 class ContratException implements Exception {

@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../../utilisateurs/data/utilisateur_gestion.dart';
 import '../../../shared/models/commission.dart';
 import '../data/commission_membre_repository.dart';
 import '../data/commission_repository.dart';
 
-class CommissionController extends ChangeNotifier {
+class CommissionController extends SafeChangeNotifier {
   CommissionController({
     required String appelOffreId,
     CommissionRepository? repository,
@@ -26,9 +26,12 @@ class CommissionController extends ChangeNotifier {
   bool _isRefreshing = false;
   bool _isCreating = false;
   bool _isAddingMember = false;
+  bool _isRemovingMember = false;
   bool _isLoadingMembers = false;
 
   String? _commissionEnCoursId;
+  String? _commissionRetraitEnCoursId;
+  String? _utilisateurRetraitEnCoursId;
   String? _errorMessage;
   String? _membersErrorMessage;
 
@@ -50,6 +53,8 @@ class CommissionController extends ChangeNotifier {
 
   bool get isAddingMember => _isAddingMember;
 
+  bool get isRemovingMember => _isRemovingMember;
+
   bool get isLoadingMembers => _isLoadingMembers;
 
   bool get isBusy {
@@ -57,6 +62,7 @@ class CommissionController extends ChangeNotifier {
         _isRefreshing ||
         _isCreating ||
         _isAddingMember ||
+        _isRemovingMember ||
         _isLoadingMembers;
   }
 
@@ -98,6 +104,17 @@ class CommissionController extends ChangeNotifier {
   ) {
     return _isAddingMember &&
         _commissionEnCoursId == commissionId.trim();
+  }
+
+  bool retraitMembreEnCours(
+    String commissionId,
+    String utilisateurId,
+  ) {
+    return _isRemovingMember &&
+        _commissionRetraitEnCoursId ==
+            commissionId.trim() &&
+        _utilisateurRetraitEnCoursId ==
+            utilisateurId.trim();
   }
 
   Future<void> charger() async {
@@ -362,6 +379,70 @@ class CommissionController extends ChangeNotifier {
     }
   }
 
+  Future<ActionRetraitMembreResult?> retirerMembre({
+    required String commissionId,
+    required String utilisateurId,
+  }) async {
+    if (_isRemovingMember) {
+      return null;
+    }
+
+    final commissionIdNormalise =
+        commissionId.trim();
+
+    final utilisateurIdNormalise =
+        utilisateurId.trim();
+
+    if (commissionIdNormalise.isEmpty) {
+      _errorMessage =
+          'La commission sélectionnée est invalide.';
+      notifyListeners();
+      return null;
+    }
+
+    if (utilisateurIdNormalise.isEmpty) {
+      _errorMessage =
+          'Le membre sélectionné est invalide.';
+      notifyListeners();
+      return null;
+    }
+
+    _isRemovingMember = true;
+    _commissionRetraitEnCoursId =
+        commissionIdNormalise;
+    _utilisateurRetraitEnCoursId =
+        utilisateurIdNormalise;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat =
+          await _repository.retirerMembre(
+        commissionId: commissionIdNormalise,
+        utilisateurId: utilisateurIdNormalise,
+      );
+
+      _retirerMembreLocalement(
+        commissionIdNormalise,
+        utilisateurIdNormalise,
+      );
+
+      return resultat;
+    } on CommissionException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de retirer le membre.';
+      return null;
+    } finally {
+      _isRemovingMember = false;
+      _commissionRetraitEnCoursId = null;
+      _utilisateurRetraitEnCoursId = null;
+      notifyListeners();
+    }
+  }
+
   Commission? trouverCommissionParId(
     String commissionId,
   ) {
@@ -508,6 +589,32 @@ class CommissionController extends ChangeNotifier {
         List<MembreCommission>.from(
       commission.membres,
     )..add(membre);
+
+    _commissions[index] = commission.copyWith(
+      membres: membresMisAJour,
+    );
+  }
+
+  void _retirerMembreLocalement(
+    String commissionId,
+    String utilisateurId,
+  ) {
+    final index = _commissions.indexWhere(
+      (commission) => commission.id == commissionId,
+    );
+
+    if (index < 0) {
+      return;
+    }
+
+    final commission = _commissions[index];
+
+    final membresMisAJour = commission.membres
+        .where(
+          (membre) =>
+              membre.utilisateurId != utilisateurId,
+        )
+        .toList();
 
     _commissions[index] = commission.copyWith(
       membres: membresMisAJour,

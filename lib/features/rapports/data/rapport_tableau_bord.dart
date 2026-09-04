@@ -183,6 +183,93 @@ class ActiviteRecente {
   }
 }
 
+class IndicateursTransparence {
+  const IndicateursTransparence({
+    required this.delaiMoyenAttributionJours,
+    required this.nombreMarchesAttribues,
+    required this.moyenneSoumissionsParMarche,
+    required this.tauxInfructueuxPourcent,
+    required this.nombreAttribues,
+    required this.nombreInfructueux,
+    required this.tauxMonoOffrePourcent,
+  });
+
+  final double? delaiMoyenAttributionJours;
+  final int nombreMarchesAttribues;
+  final double? moyenneSoumissionsParMarche;
+  final double? tauxInfructueuxPourcent;
+  final int nombreAttribues;
+  final int nombreInfructueux;
+  final double? tauxMonoOffrePourcent;
+
+  factory IndicateursTransparence.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return IndicateursTransparence(
+      delaiMoyenAttributionJours: _parseDoubleNullable(
+        json['delai_moyen_attribution_jours'],
+      ),
+      nombreMarchesAttribues: _parseInt(
+        json['nombre_marches_attribues'],
+      ),
+      moyenneSoumissionsParMarche: _parseDoubleNullable(
+        json['moyenne_soumissions_par_marche'],
+      ),
+      tauxInfructueuxPourcent: _parseDoubleNullable(
+        json['taux_infructueux_pourcent'],
+      ),
+      nombreAttribues: _parseInt(
+        json['nombre_attribues'],
+      ),
+      nombreInfructueux: _parseInt(
+        json['nombre_infructueux'],
+      ),
+      tauxMonoOffrePourcent: _parseDoubleNullable(
+        json['taux_mono_offre_pourcent'],
+      ),
+    );
+  }
+
+  static const vide = IndicateursTransparence(
+    delaiMoyenAttributionJours: null,
+    nombreMarchesAttribues: 0,
+    moyenneSoumissionsParMarche: null,
+    tauxInfructueuxPourcent: null,
+    nombreAttribues: 0,
+    nombreInfructueux: 0,
+    tauxMonoOffrePourcent: null,
+  );
+}
+
+class ActiviteMensuelle {
+  const ActiviteMensuelle({
+    required this.moisDebut,
+    required this.publiees,
+    required this.cloturees,
+  });
+
+  final DateTime moisDebut;
+  final int publiees;
+  final int cloturees;
+
+  factory ActiviteMensuelle.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return ActiviteMensuelle(
+      moisDebut: _parseDate(
+            json['mois_debut'],
+          ) ??
+          DateTime.now(),
+      publiees: _parseInt(
+        json['publiees'],
+      ),
+      cloturees: _parseInt(
+        json['cloturees'],
+      ),
+    );
+  }
+}
+
 Map<String, dynamic> _convertirMap(
   dynamic valeur,
 ) {
@@ -261,6 +348,29 @@ double _parseDouble(
   }
 
   return double.tryParse(texte) ?? 0;
+}
+
+double? _parseDoubleNullable(
+  dynamic valeur,
+) {
+  if (valeur == null) {
+    return null;
+  }
+
+  if (valeur is num) {
+    return valeur.toDouble();
+  }
+
+  final texte = valeur
+      .toString()
+      .trim()
+      .replaceAll(',', '.');
+
+  if (texte.isEmpty) {
+    return null;
+  }
+
+  return double.tryParse(texte);
 }
 
 DateTime? _parseDate(

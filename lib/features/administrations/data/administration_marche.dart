@@ -10,6 +10,9 @@ class AdministrationMarche {
     required this.actif,
     this.dateCreation,
     this.dateMaj,
+    this.nombreUtilisateurs = 0,
+    this.nombreAppelsOffres = 0,
+    this.nombreContrats = 0,
   });
 
   final String id;
@@ -24,6 +27,10 @@ class AdministrationMarche {
 
   final DateTime? dateCreation;
   final DateTime? dateMaj;
+
+  final int nombreUtilisateurs;
+  final int nombreAppelsOffres;
+  final int nombreContrats;
 
   factory AdministrationMarche.fromJson(
     Map<String, dynamic> json,
@@ -60,6 +67,15 @@ class AdministrationMarche {
       dateMaj: _parseDate(
         json['date_maj'],
       ),
+      nombreUtilisateurs: _parseInt(
+        json['nombre_utilisateurs'],
+      ),
+      nombreAppelsOffres: _parseInt(
+        json['nombre_appels_offres'],
+      ),
+      nombreContrats: _parseInt(
+        json['nombre_contrats'],
+      ),
     );
   }
 
@@ -74,6 +90,9 @@ class AdministrationMarche {
     bool? actif,
     DateTime? dateCreation,
     DateTime? dateMaj,
+    int? nombreUtilisateurs,
+    int? nombreAppelsOffres,
+    int? nombreContrats,
   }) {
     return AdministrationMarche(
       id: id ?? this.id,
@@ -89,6 +108,15 @@ class AdministrationMarche {
       dateCreation:
           dateCreation ?? this.dateCreation,
       dateMaj: dateMaj ?? this.dateMaj,
+      nombreUtilisateurs:
+          nombreUtilisateurs ??
+              this.nombreUtilisateurs,
+      nombreAppelsOffres:
+          nombreAppelsOffres ??
+              this.nombreAppelsOffres,
+      nombreContrats:
+          nombreContrats ??
+              this.nombreContrats,
     );
   }
 

@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/administration_marche.dart';
 import '../data/administration_repository.dart';
 
-class AdministrationController extends ChangeNotifier {
+class AdministrationController extends SafeChangeNotifier {
   AdministrationController({
     AdministrationRepository? repository,
   }) : _repository =
@@ -17,6 +17,7 @@ class AdministrationController extends ChangeNotifier {
   bool _isRefreshing = false;
   bool _isCreating = false;
 
+  String? _administrationEnCoursId;
   String? _errorMessage;
   String _recherche = '';
 
@@ -62,7 +63,8 @@ class AdministrationController extends ChangeNotifier {
   bool get isBusy {
     return _isLoading ||
         _isRefreshing ||
-        _isCreating;
+        _isCreating ||
+        _administrationEnCoursId != null;
   }
 
   String? get errorMessage => _errorMessage;
@@ -94,6 +96,13 @@ class AdministrationController extends ChangeNotifier {
         .length;
   }
 
+  bool actionEnCoursPour(
+    String administrationId,
+  ) {
+    return _administrationEnCoursId ==
+        administrationId.trim();
+  }
+
   Future<void> charger() async {
     if (_isLoading) {
       return;
@@ -105,7 +114,7 @@ class AdministrationController extends ChangeNotifier {
 
     try {
       final resultat =
-          await _repository.listerAdministrations();
+          await _repository.listerGestion();
 
       _administrations =
           List<AdministrationMarche>.from(
@@ -135,7 +144,7 @@ class AdministrationController extends ChangeNotifier {
 
     try {
       final resultat =
-          await _repository.listerAdministrations();
+          await _repository.listerGestion();
 
       _administrations =
           List<AdministrationMarche>.from(
@@ -200,6 +209,154 @@ class AdministrationController extends ChangeNotifier {
     }
   }
 
+  Future<ActionAdministrationResult?>
+      modifierAdministration({
+    required AdministrationMarche
+        administration,
+    required DonneesAdministration donnees,
+  }) async {
+    final id = administration.id.trim();
+
+    if (id.isEmpty ||
+        _administrationEnCoursId != null) {
+      return null;
+    }
+
+    _administrationEnCoursId = id;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat =
+          await _repository.modifier(
+        administrationId: id,
+        donnees: donnees,
+      );
+
+      final administrationRetournee =
+          resultat.administration;
+
+      final index = _administrations.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0 &&
+          administrationRetournee != null) {
+        _administrations[index] =
+            administrationRetournee;
+
+        _trierAdministrations();
+      } else {
+        await _rechargerSansEtat();
+      }
+
+      return resultat;
+    } on AdministrationException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de modifier l’administration.';
+      return null;
+    } finally {
+      _administrationEnCoursId = null;
+      notifyListeners();
+    }
+  }
+
+  Future<ActionAdministrationResult?>
+      changerStatut({
+    required AdministrationMarche
+        administration,
+    required bool actif,
+  }) async {
+    final id = administration.id.trim();
+
+    if (id.isEmpty ||
+        _administrationEnCoursId != null) {
+      return null;
+    }
+
+    _administrationEnCoursId = id;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat =
+          await _repository.changerStatut(
+        administrationId: id,
+        actif: actif,
+      );
+
+      final index = _administrations.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0) {
+        final administrationRetournee =
+            resultat.administration;
+
+        _administrations[index] =
+            administrationRetournee ??
+                _administrations[index].copyWith(
+                  actif: actif,
+                  dateMaj: DateTime.now(),
+                );
+
+        _trierAdministrations();
+      }
+
+      return resultat;
+    } on AdministrationException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de modifier le statut de l’administration.';
+      return null;
+    } finally {
+      _administrationEnCoursId = null;
+      notifyListeners();
+    }
+  }
+
+  Future<AdministrationMarche?>
+      obtenirDetail(
+    String administrationId,
+  ) async {
+    final id = administrationId.trim();
+
+    if (id.isEmpty) {
+      return null;
+    }
+
+    try {
+      final administration =
+          await _repository.obtenir(id);
+
+      final index = _administrations.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0) {
+        _administrations[index] =
+            administration;
+        notifyListeners();
+      }
+
+      return administration;
+    } on AdministrationException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de charger l’administration.';
+      notifyListeners();
+      return null;
+    }
+  }
+
   void rechercher(
     String valeur,
   ) {
@@ -253,7 +410,7 @@ class AdministrationController extends ChangeNotifier {
 
   Future<void> _rechargerSansEtat() async {
     final resultat =
-        await _repository.listerAdministrations();
+        await _repository.listerGestion();
 
     _administrations =
         List<AdministrationMarche>.from(

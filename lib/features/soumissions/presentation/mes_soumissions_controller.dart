@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/soumission.dart';
 import '../data/soumission_repository.dart';
 
-class MesSoumissionsController extends ChangeNotifier {
+class MesSoumissionsController extends SafeChangeNotifier {
   MesSoumissionsController({
     SoumissionRepository? repository,
   }) : _repository = repository ?? SoumissionRepository();

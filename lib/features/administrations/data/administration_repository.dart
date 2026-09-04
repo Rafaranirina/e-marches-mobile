@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'administration_marche.dart';
 
 class AdministrationRepository {
@@ -36,6 +37,95 @@ class AdministrationRepository {
     } catch (_) {
       throw const AdministrationException(
         'La liste des administrations reçue est invalide.',
+      );
+    }
+  }
+
+  Future<ListeAdministrationsResult>
+      listerGestion() async {
+    try {
+      final response = await _dio.get(
+        '/api/administrations/gestion',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ListeAdministrationsResult.fromJson(
+        data,
+      );
+    } on DioException catch (error) {
+      throw AdministrationException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger les administrations.',
+        ),
+      );
+    } on AdministrationException {
+      rethrow;
+    } catch (_) {
+      throw const AdministrationException(
+        'La liste des administrations reçue est invalide.',
+      );
+    }
+  }
+
+  Future<AdministrationMarche> obtenir(
+    String administrationId,
+  ) async {
+    final id = administrationId.trim();
+
+    if (id.isEmpty) {
+      throw const AdministrationException(
+        'L’administration sélectionnée est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.get(
+        '/api/administrations/$id',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      final administrationData =
+          data['administration'];
+
+      if (administrationData is! Map) {
+        throw const AdministrationException(
+          'L’administration reçue est invalide.',
+        );
+      }
+
+      final administration =
+          AdministrationMarche.fromJson(
+        Map<String, dynamic>.from(
+          administrationData,
+        ),
+      );
+
+      if (administration.id.isEmpty) {
+        throw const AdministrationException(
+          'L’administration reçue est invalide.',
+        );
+      }
+
+      return administration;
+    } on DioException catch (error) {
+      throw AdministrationException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger l’administration.',
+        ),
+      );
+    } on AdministrationException {
+      rethrow;
+    } catch (_) {
+      throw const AdministrationException(
+        'L’administration reçue est invalide.',
       );
     }
   }
@@ -93,6 +183,126 @@ class AdministrationRepository {
         'La réponse du serveur est invalide.',
       );
     }
+  }
+
+  Future<ActionAdministrationResult>
+      modifier({
+    required String administrationId,
+    required DonneesAdministration donnees,
+  }) async {
+    final id = administrationId.trim();
+
+    if (id.isEmpty) {
+      throw const AdministrationException(
+        'L’administration sélectionnée est invalide.',
+      );
+    }
+
+    _validerDonnees(
+      donnees,
+    );
+
+    try {
+      final response = await _dio.put(
+        '/api/administrations/$id',
+        data: donnees.versJson(),
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ActionAdministrationResult(
+        message: _extraireMessageReponse(
+          data,
+          'Administration modifiée avec succès.',
+        ),
+        administration:
+            _extraireAdministration(data),
+      );
+    } on DioException catch (error) {
+      throw AdministrationException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de modifier l’administration.',
+        ),
+      );
+    } on AdministrationException {
+      rethrow;
+    } catch (_) {
+      throw const AdministrationException(
+        'La réponse du serveur est invalide.',
+      );
+    }
+  }
+
+  Future<ActionAdministrationResult>
+      changerStatut({
+    required String administrationId,
+    required bool actif,
+  }) async {
+    final id = administrationId.trim();
+
+    if (id.isEmpty) {
+      throw const AdministrationException(
+        'L’administration sélectionnée est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.patch(
+        '/api/administrations/$id/statut',
+        data: {
+          'actif': actif,
+        },
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ActionAdministrationResult(
+        message: _extraireMessageReponse(
+          data,
+          actif
+              ? 'Administration activée avec succès.'
+              : 'Administration désactivée avec succès.',
+        ),
+        administration:
+            _extraireAdministration(data),
+      );
+    } on DioException catch (error) {
+      throw AdministrationException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de modifier le statut de l’administration.',
+        ),
+      );
+    } on AdministrationException {
+      rethrow;
+    } catch (_) {
+      throw const AdministrationException(
+        'La réponse du serveur est invalide.',
+      );
+    }
+  }
+
+  AdministrationMarche?
+      _extraireAdministration(
+    Map<String, dynamic> data,
+  ) {
+    final administrationData =
+        data['administration'];
+
+    if (administrationData is! Map) {
+      return null;
+    }
+
+    return AdministrationMarche.fromJson(
+      Map<String, dynamic>.from(
+        administrationData,
+      ),
+    );
   }
 
   void _validerDonnees(
@@ -154,54 +364,16 @@ class AdministrationRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à créer une administration.';
-
-      case 409:
-        return 'Cette administration existe déjà.';
-
-      case 500:
-        return 'Une erreur interne est survenue sur le serveur.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        403: 'Vous n’êtes pas autorisé à gérer les administrations.',
+        404: 'L’administration est introuvable.',
+        409: 'Cette administration existe déjà.',
+      },
+    );
   }
 }
 

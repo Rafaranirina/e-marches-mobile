@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/categorie_marche.dart';
 import '../data/categorie_repository.dart';
 
-class CategorieController extends ChangeNotifier {
+class CategorieController extends SafeChangeNotifier {
   CategorieController({
     CategorieRepository? repository,
   }) : _repository =
@@ -16,10 +16,14 @@ class CategorieController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isRefreshing = false;
   bool _isCreating = false;
+  bool _modeGestion = false;
 
+  String? _categorieEnCoursId;
   String? _errorMessage;
+
   String _recherche = '';
   String _filtreType = 'toutes';
+  String _filtreStatut = 'toutes';
 
   List<CategorieMarche> get categories {
     return List.unmodifiable(_categories);
@@ -47,8 +51,16 @@ class CategorieController extends ChangeNotifier {
                 (_filtreType == 'sous_categories' &&
                     categorie.estSousCategorie);
 
+        final correspondStatut =
+            _filtreStatut == 'toutes' ||
+                (_filtreStatut == 'actives' &&
+                    categorie.actif) ||
+                (_filtreStatut == 'inactives' &&
+                    !categorie.actif);
+
         return correspondRecherche &&
-            correspondType;
+            correspondType &&
+            correspondStatut;
       },
     ).toList();
   }
@@ -69,10 +81,13 @@ class CategorieController extends ChangeNotifier {
 
   bool get isCreating => _isCreating;
 
+  bool get modeGestion => _modeGestion;
+
   bool get isBusy {
     return _isLoading ||
         _isRefreshing ||
-        _isCreating;
+        _isCreating ||
+        _categorieEnCoursId != null;
   }
 
   String? get errorMessage => _errorMessage;
@@ -85,6 +100,8 @@ class CategorieController extends ChangeNotifier {
   String get recherche => _recherche;
 
   String get filtreType => _filtreType;
+
+  String get filtreStatut => _filtreStatut;
 
   int get nombreTotal => _categories.length;
 
@@ -106,18 +123,42 @@ class CategorieController extends ChangeNotifier {
         .length;
   }
 
-  Future<void> charger() async {
+  int get nombreActives => _categories
+      .where(
+        (categorie) => categorie.actif,
+      )
+      .length;
+
+  int get nombreInactives => _categories
+      .where(
+        (categorie) => !categorie.actif,
+      )
+      .length;
+
+  bool actionEnCoursPour(
+    String categorieId,
+  ) {
+    return _categorieEnCoursId ==
+        categorieId.trim();
+  }
+
+  Future<void> charger({
+    bool modeGestion = false,
+  }) async {
     if (_isLoading) {
       return;
     }
 
+    _modeGestion = modeGestion;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final resultat =
-          await _repository.listerCategories();
+      final resultat = _modeGestion
+          ? await _repository.listerGestion()
+          : await _repository
+              .listerCategories();
 
       _categories = List<CategorieMarche>.from(
         resultat.categories,
@@ -145,8 +186,10 @@ class CategorieController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final resultat =
-          await _repository.listerCategories();
+      final resultat = _modeGestion
+          ? await _repository.listerGestion()
+          : await _repository
+              .listerCategories();
 
       _categories = List<CategorieMarche>.from(
         resultat.categories,
@@ -205,6 +248,180 @@ class CategorieController extends ChangeNotifier {
     }
   }
 
+  Future<ActionCategorieResult?>
+      modifierCategorie({
+    required CategorieMarche categorie,
+    required DonneesCategorie donnees,
+  }) async {
+    final id = categorie.id.trim();
+
+    if (id.isEmpty ||
+        _categorieEnCoursId != null) {
+      return null;
+    }
+
+    _categorieEnCoursId = id;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat =
+          await _repository.modifierCategorie(
+        categorieId: id,
+        donnees: donnees,
+      );
+
+      final categorieRetournee =
+          resultat.categorie;
+
+      final index = _categories.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0 &&
+          categorieRetournee != null) {
+        final nouveauParentId =
+            categorieRetournee
+                .categorieParentId;
+
+        final parentTrouve =
+            nouveauParentId == null
+                ? null
+                : trouverParId(
+                    nouveauParentId,
+                  );
+
+        _categories[index] =
+            categorie.copyWith(
+          nom: categorieRetournee.nom,
+          description:
+              categorieRetournee
+                  .description,
+          categorieParentId:
+              nouveauParentId,
+          categorieParentNom:
+              parentTrouve?.nom,
+          categorieParentActif:
+              parentTrouve?.actif,
+          supprimerCategorieParent:
+              nouveauParentId == null,
+          actif: categorieRetournee.actif,
+          dateCreation:
+              categorieRetournee
+                      .dateCreation ??
+                  categorie.dateCreation,
+          dateMaj:
+              categorieRetournee.dateMaj ??
+                  DateTime.now(),
+        );
+
+        _trierCategories();
+      } else {
+        await _rechargerSansEtat();
+      }
+
+      return resultat;
+    } on CategorieException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de modifier la catégorie.';
+      return null;
+    } finally {
+      _categorieEnCoursId = null;
+      notifyListeners();
+    }
+  }
+
+  Future<ActionCategorieResult?>
+      changerStatut({
+    required CategorieMarche categorie,
+    required bool actif,
+  }) async {
+    final id = categorie.id.trim();
+
+    if (id.isEmpty ||
+        _categorieEnCoursId != null) {
+      return null;
+    }
+
+    _categorieEnCoursId = id;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final resultat =
+          await _repository.changerStatut(
+        categorieId: id,
+        actif: actif,
+      );
+
+      final index = _categories.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0) {
+        final actifRetourne =
+            resultat.categorie?.actif;
+
+        _categories[index] =
+            _categories[index].copyWith(
+          actif: actifRetourne ?? actif,
+          dateMaj:
+              resultat.categorie?.dateMaj ??
+                  DateTime.now(),
+        );
+
+        _trierCategories();
+      } else {
+        await _rechargerSansEtat();
+      }
+
+      return resultat;
+    } on CategorieException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Impossible de modifier le statut de la catégorie.';
+      return null;
+    } finally {
+      _categorieEnCoursId = null;
+      notifyListeners();
+    }
+  }
+
+  Future<void> rafraichirDetail(
+    String categorieId,
+  ) async {
+    final id = categorieId.trim();
+
+    if (id.isEmpty) {
+      return;
+    }
+
+    try {
+      final categorie = await _repository
+          .obtenirCategorie(id);
+
+      final index = _categories.indexWhere(
+        (element) => element.id == id,
+      );
+
+      if (index >= 0) {
+        _categories[index] = categorie;
+      } else {
+        _categories.add(categorie);
+      }
+
+      _trierCategories();
+      notifyListeners();
+    } catch (_) {
+      // Silencieux : les données déjà chargées restent affichées.
+    }
+  }
+
   void rechercher(
     String valeur,
   ) {
@@ -244,10 +461,36 @@ class CategorieController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void filtrerParStatut(
+    String statut,
+  ) {
+    final statutNormalise =
+        statut.trim().toLowerCase();
+
+    const statutsAutorises = [
+      'toutes',
+      'actives',
+      'inactives',
+    ];
+
+    final nouveauFiltre =
+        statutsAutorises.contains(statutNormalise)
+            ? statutNormalise
+            : 'toutes';
+
+    if (_filtreStatut == nouveauFiltre) {
+      return;
+    }
+
+    _filtreStatut = nouveauFiltre;
+    notifyListeners();
+  }
+
   void reinitialiserFiltres() {
     final filtresDejaVides =
         _recherche.isEmpty &&
-            _filtreType == 'toutes';
+            _filtreType == 'toutes' &&
+            _filtreStatut == 'toutes';
 
     if (filtresDejaVides) {
       return;
@@ -255,6 +498,7 @@ class CategorieController extends ChangeNotifier {
 
     _recherche = '';
     _filtreType = 'toutes';
+    _filtreStatut = 'toutes';
     notifyListeners();
   }
 
@@ -301,8 +545,10 @@ class CategorieController extends ChangeNotifier {
   }
 
   Future<void> _rechargerSansEtat() async {
-    final resultat =
-        await _repository.listerCategories();
+    final resultat = _modeGestion
+        ? await _repository.listerGestion()
+        : await _repository
+            .listerCategories();
 
     _categories = List<CategorieMarche>.from(
       resultat.categories,

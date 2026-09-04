@@ -11,12 +11,15 @@ dependencies:
   flutter:
     sdk: flutter
 
+  connectivity_plus: ^6.1.4
   cupertino_icons: ^1.0.8
   dio: ^5.11.0
   flutter_secure_storage: ^10.3.1
+  google_fonts: ^6.2.1
   provider: ^6.1.5+1
   intl: ^0.20.3
   file_picker: 10.3.10
+  image_picker: ^1.1.2
   url_launcher: ^6.3.2
 
 dev_dependencies:
@@ -27,3 +30,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/

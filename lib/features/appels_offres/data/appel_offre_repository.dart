@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/network/dio_error_mapper.dart';
 import 'appel_offre.dart';
+import 'appel_offre_historique.dart';
 import 'appel_offre_referentiels.dart';
 
 class AppelOffreRepository {
@@ -280,6 +281,46 @@ class AppelOffreRepository {
         _extractErrorMessage(
           error,
           'Impossible de changer le statut de l’appel d’offres.',
+        ),
+      );
+    }
+  }
+
+  Future<List<AppelOffreHistorique>> obtenirHistorique(
+    String id,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '/api/appels-offres/$id/historique',
+      );
+
+      final data = _mapResponse(response.data);
+      final liste = data['historique'];
+
+      if (liste is! List) {
+        throw const AppelOffreException(
+          'L’historique de l’appel d’offres est invalide.',
+        );
+      }
+
+      return liste
+          .whereType<Map>()
+          .map(
+            (item) => AppelOffreHistorique.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .where(
+            (entree) => entree.id.isNotEmpty,
+          )
+          .toList();
+    } on AppelOffreException {
+      rethrow;
+    } on DioException catch (error) {
+      throw AppelOffreException(
+        _extractErrorMessage(
+          error,
+          'Impossible de récupérer l’historique de l’appel d’offres.',
         ),
       );
     }

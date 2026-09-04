@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../documents/presentation/documents_page.dart';
 import '../data/contrat.dart';
+import '../data/jalon_contrat.dart';
 import '../data/paiement.dart';
 import 'contrat_details_controller.dart';
+import 'contrat_statut_styles.dart';
 
 class ContratDetailsPage extends StatelessWidget {
   const ContratDetailsPage({
@@ -199,6 +203,326 @@ class _ContratDetailsView extends StatelessWidget {
     );
   }
 
+  Future<void> _archiverContrat(
+    BuildContext context,
+  ) async {
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Archiver le contrat',
+          ),
+          content: const Text(
+            'Ce contrat ne sera plus visible dans la liste active. '
+            'Confirmer l’archivage ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(false);
+              },
+              child: const Text(
+                'Annuler',
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(true);
+              },
+              icon: const Icon(
+                Icons.archive_outlined,
+              ),
+              label: const Text(
+                'Archiver',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmation != true ||
+        !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final resultat =
+        await controller.archiver();
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible d’archiver le contrat.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _desarchiverContrat(
+    BuildContext context,
+  ) async {
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Désarchiver le contrat',
+          ),
+          content: const Text(
+            'Ce contrat redeviendra visible dans la liste active. '
+            'Confirmer le désarchivage ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(false);
+              },
+              child: const Text(
+                'Annuler',
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(true);
+              },
+              icon: const Icon(
+                Icons.unarchive_outlined,
+              ),
+              label: const Text(
+                'Désarchiver',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmation != true ||
+        !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final resultat =
+        await controller.desarchiver();
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de désarchiver le contrat.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _modifierAvancement(
+    BuildContext context,
+    int avancementActuel,
+  ) async {
+    final nouvelAvancement =
+        await showDialog<int>(
+      context: context,
+      builder: (_) => _AvancementDialog(
+        avancementInitial: avancementActuel,
+      ),
+    );
+
+    if (nouvelAvancement == null ||
+        !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final resultat = await controller
+        .mettreAJourAvancement(
+      nouvelAvancement,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de mettre à jour l’avancement.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _ajouterJalon(
+    BuildContext context,
+  ) async {
+    final donnees =
+        await showDialog<_JalonFormData>(
+      context: context,
+      builder: (_) => const _JalonDialog(),
+    );
+
+    if (donnees == null || !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final resultat = await controller.creerJalon(
+      titre: donnees.titre,
+      description: donnees.description,
+      ordre: donnees.ordre,
+      datePrevue: donnees.datePrevue,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de créer le jalon.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _modifierJalon(
+    BuildContext context,
+    JalonContrat jalon,
+  ) async {
+    final donnees =
+        await showDialog<_JalonFormData>(
+      context: context,
+      builder: (_) => _JalonDialog(
+        jalon: jalon,
+      ),
+    );
+
+    if (donnees == null || !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final resultat = await controller.modifierJalon(
+      jalonId: jalon.id,
+      titre: donnees.titre,
+      description: donnees.description,
+      statut: donnees.statut,
+      datePrevue: donnees.datePrevue,
+      dateReelle: donnees.dateReelle,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de mettre à jour le jalon.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _supprimerJalon(
+    BuildContext context,
+    JalonContrat jalon,
+  ) async {
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Supprimer le jalon',
+          ),
+          content: Text(
+            'Confirmer la suppression du jalon '
+            '« ${jalon.titre} » ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(false);
+              },
+              child: const Text(
+                'Annuler',
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(true);
+              },
+              icon: const Icon(
+                Icons.delete_outline,
+              ),
+              label: const Text(
+                'Supprimer',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmation != true ||
+        !context.mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<ContratDetailsController>();
+
+    final succes =
+        await controller.supprimerJalon(
+      jalon.id,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      context,
+      succes
+          ? 'Jalon supprimé.'
+          : controller.errorMessage ??
+              'Impossible de supprimer le jalon.',
+      estErreur: !succes,
+    );
+  }
+
   void _afficherMessage(
     BuildContext context,
     String message, {
@@ -278,6 +602,51 @@ class _ContratDetailsView extends StatelessWidget {
               icon: const Icon(
                 Icons.edit_outlined,
               ),
+            ),
+          if (peutGerer &&
+              controller.contrat != null)
+            PopupMenuButton<_ActionContrat>(
+              tooltip: 'Autres actions',
+              enabled: !controller.isSubmitting,
+              onSelected: (action) {
+                switch (action) {
+                  case _ActionContrat.archiver:
+                    _archiverContrat(context);
+                    break;
+
+                  case _ActionContrat.desarchiver:
+                    _desarchiverContrat(context);
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                if (!controller.contrat!.archive)
+                  const PopupMenuItem(
+                    value:
+                        _ActionContrat.archiver,
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.archive_outlined,
+                      ),
+                      title: Text(
+                        'Archiver le contrat',
+                      ),
+                    ),
+                  )
+                else
+                  const PopupMenuItem(
+                    value: _ActionContrat
+                        .desarchiver,
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.unarchive_outlined,
+                      ),
+                      title: Text(
+                        'Désarchiver le contrat',
+                      ),
+                    ),
+                  ),
+              ],
             ),
           IconButton(
             tooltip: 'Actualiser',
@@ -481,6 +850,35 @@ class _ContratDetailsView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          _AvancementCard(
+            avancement: contrat.avancement,
+            peutGerer: peutGerer,
+            isSubmitting:
+                controller.isSubmitting,
+            onModifier: () {
+              _modifierAvancement(
+                context,
+                contrat.avancement,
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _JalonsCard(
+            jalons: controller.jalons,
+            peutGerer: peutGerer,
+            isSubmitting:
+                controller.isSubmitting,
+            onAjouter: () {
+              _ajouterJalon(context);
+            },
+            onModifier: (jalon) {
+              _modifierJalon(context, jalon);
+            },
+            onSupprimer: (jalon) {
+              _supprimerJalon(context, jalon);
+            },
+          ),
+          const SizedBox(height: 12),
           _ResumePaiements(
             montantContrat:
                 contrat.montant,
@@ -536,8 +934,20 @@ class _EnteteContrat extends StatelessWidget {
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
-            _StatutContratChip(
-              statut: contrat.statut,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                StatutChip(
+                  statut: contrat.statut,
+                  styles: contratStatutStyles,
+                ),
+                if (contrat.archive)
+                  _ArchiveChip(
+                    dateArchivage:
+                        contrat.dateArchivage,
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             Text(
@@ -885,9 +1295,9 @@ class _PaiementTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  _StatutPaiementChip(
-                    statut:
-                        paiement.statut,
+                  StatutChip(
+                    statut: paiement.statut,
+                    styles: paiementStatutStyles,
                   ),
                 ],
               ),
@@ -1489,6 +1899,730 @@ class _AjoutPaiementDialogState
   }
 }
 
+class _AvancementCard extends StatelessWidget {
+  const _AvancementCard({
+    required this.avancement,
+    required this.peutGerer,
+    required this.isSubmitting,
+    required this.onModifier,
+  });
+
+  final int avancement;
+  final bool peutGerer;
+  final bool isSubmitting;
+  final VoidCallback onModifier;
+
+  @override
+  Widget build(BuildContext context) {
+    final avancementBorne =
+        avancement.clamp(0, 100);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Avancement physique',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                          fontWeight:
+                              FontWeight.bold,
+                        ),
+                  ),
+                ),
+                if (peutGerer)
+                  IconButton(
+                    tooltip:
+                        'Modifier l’avancement',
+                    onPressed: isSubmitting
+                        ? null
+                        : onModifier,
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                    ),
+                  ),
+              ],
+            ),
+            const Divider(height: 28),
+            ClipRRect(
+              borderRadius:
+                  BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: avancementBorne / 100,
+                minHeight: 10,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '$avancementBorne %',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvancementDialog
+    extends StatefulWidget {
+  const _AvancementDialog({
+    required this.avancementInitial,
+  });
+
+  final int avancementInitial;
+
+  @override
+  State<_AvancementDialog> createState() =>
+      _AvancementDialogState();
+}
+
+class _AvancementDialogState
+    extends State<_AvancementDialog> {
+  late double _valeur;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _valeur = widget.avancementInitial
+        .clamp(0, 100)
+        .toDouble();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valeurArrondie = _valeur.round();
+
+    return AlertDialog(
+      title: const Text(
+        'Modifier l’avancement',
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$valeurArrondie %',
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+            ),
+            Slider(
+              value: _valeur,
+              min: 0,
+              max: 100,
+              divisions: 100,
+              label: '$valeurArrondie %',
+              onChanged: (value) {
+                setState(() {
+                  _valeur = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop(
+              valeurArrondie,
+            );
+          },
+          icon: const Icon(
+            Icons.save_outlined,
+          ),
+          label: const Text(
+            'Enregistrer',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _JalonsCard extends StatelessWidget {
+  const _JalonsCard({
+    required this.jalons,
+    required this.peutGerer,
+    required this.isSubmitting,
+    required this.onAjouter,
+    required this.onModifier,
+    required this.onSupprimer,
+  });
+
+  final List<JalonContrat> jalons;
+  final bool peutGerer;
+  final bool isSubmitting;
+  final VoidCallback onAjouter;
+  final ValueChanged<JalonContrat> onModifier;
+  final ValueChanged<JalonContrat>
+      onSupprimer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Jalons d’exécution',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                          fontWeight:
+                              FontWeight.bold,
+                        ),
+                  ),
+                ),
+                Chip(
+                  avatar: const Icon(
+                    Icons.flag_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    jalons.length.toString(),
+                  ),
+                ),
+                if (peutGerer)
+                  IconButton(
+                    tooltip:
+                        'Ajouter un jalon',
+                    onPressed: isSubmitting
+                        ? null
+                        : onAjouter,
+                    icon: const Icon(
+                      Icons
+                          .add_circle_outline,
+                    ),
+                  ),
+              ],
+            ),
+            const Divider(height: 28),
+            if (jalons.isEmpty)
+              const Padding(
+                padding:
+                    EdgeInsets.symmetric(
+                  vertical: 16,
+                ),
+                child: Text(
+                  'Aucun jalon n’est encore défini pour ce contrat.',
+                  textAlign:
+                      TextAlign.center,
+                ),
+              )
+            else
+              ...jalons.map(
+                (jalon) {
+                  return _JalonTile(
+                    jalon: jalon,
+                    peutGerer: peutGerer,
+                    isSubmitting:
+                        isSubmitting,
+                    onModifier: () {
+                      onModifier(jalon);
+                    },
+                    onSupprimer: () {
+                      onSupprimer(jalon);
+                    },
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _JalonTile extends StatelessWidget {
+  const _JalonTile({
+    required this.jalon,
+    required this.peutGerer,
+    required this.isSubmitting,
+    required this.onModifier,
+    required this.onSupprimer,
+  });
+
+  final JalonContrat jalon;
+  final bool peutGerer;
+  final bool isSubmitting;
+  final VoidCallback onModifier;
+  final VoidCallback onSupprimer;
+
+  @override
+  Widget build(BuildContext context) {
+    final description =
+        jalon.description?.trim() ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: 12,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context)
+                .colorScheme
+                .outlineVariant,
+          ),
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      jalon.titre.isEmpty
+                          ? 'Jalon'
+                          : jalon.titre,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight
+                                    .bold,
+                          ),
+                    ),
+                  ),
+                  StatutChip(
+                    statut: jalon.statut,
+                    styles: jalonStatutStyles,
+                  ),
+                ],
+              ),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(description),
+              ],
+              const SizedBox(height: 10),
+              _PetitDetail(
+                icon:
+                    Icons.event_outlined,
+                texte:
+                    'Prévu : ${_formatDate(jalon.datePrevue)}',
+              ),
+              if (jalon.dateReelle !=
+                  null) ...[
+                const SizedBox(height: 6),
+                _PetitDetail(
+                  icon: Icons
+                      .event_available_outlined,
+                  texte:
+                      'Réalisé : ${_formatDate(jalon.dateReelle)}',
+                ),
+              ],
+              if (peutGerer) ...[
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed:
+                          isSubmitting
+                              ? null
+                              : onModifier,
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                      ),
+                      label: const Text(
+                        'Modifier',
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed:
+                          isSubmitting
+                              ? null
+                              : onSupprimer,
+                      icon: const Icon(
+                        Icons
+                            .delete_outline,
+                      ),
+                      label: const Text(
+                        'Supprimer',
+                      ),
+                      style: TextButton
+                          .styleFrom(
+                        foregroundColor:
+                            Theme.of(context)
+                                .colorScheme
+                                .error,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _JalonDialog extends StatefulWidget {
+  const _JalonDialog({
+    this.jalon,
+  });
+
+  final JalonContrat? jalon;
+
+  @override
+  State<_JalonDialog> createState() =>
+      _JalonDialogState();
+}
+
+class _JalonDialogState
+    extends State<_JalonDialog> {
+  static const _statuts = {
+    'a_venir': 'À venir',
+    'en_cours': 'En cours',
+    'termine': 'Terminé',
+    'retard': 'En retard',
+  };
+
+  final GlobalKey<FormState> _formKey =
+      GlobalKey<FormState>();
+
+  final TextEditingController
+      _titreController =
+      TextEditingController();
+
+  final TextEditingController
+      _descriptionController =
+      TextEditingController();
+
+  final TextEditingController
+      _ordreController =
+      TextEditingController();
+
+  DateTime? _datePrevue;
+  DateTime? _dateReelle;
+  late String _statut;
+
+  bool get _estModification =>
+      widget.jalon != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final jalon = widget.jalon;
+
+    if (jalon != null) {
+      _titreController.text = jalon.titre;
+      _descriptionController.text =
+          jalon.description ?? '';
+      _ordreController.text =
+          jalon.ordre.toString();
+      _datePrevue = jalon.datePrevue;
+      _dateReelle = jalon.dateReelle;
+
+      final statutActuel =
+          jalon.statut.trim().toLowerCase();
+
+      _statut = _statuts.containsKey(
+        statutActuel,
+      )
+          ? statutActuel
+          : 'a_venir';
+    } else {
+      _statut = 'a_venir';
+    }
+  }
+
+  @override
+  void dispose() {
+    _titreController.dispose();
+    _descriptionController.dispose();
+    _ordreController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectionnerDate({
+    required bool reelle,
+  }) async {
+    final dateActuelle =
+        reelle ? _dateReelle : _datePrevue;
+
+    final dateSelectionnee =
+        await showDatePicker(
+      context: context,
+      initialDate:
+          dateActuelle ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      helpText: reelle
+          ? 'Date réelle du jalon'
+          : 'Date prévue du jalon',
+      cancelText: 'Annuler',
+      confirmText: 'Confirmer',
+    );
+
+    if (dateSelectionnee == null) {
+      return;
+    }
+
+    setState(() {
+      if (reelle) {
+        _dateReelle = dateSelectionnee;
+      } else {
+        _datePrevue = dateSelectionnee;
+      }
+    });
+  }
+
+  void _confirmer() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final ordreTexte =
+        _ordreController.text.trim();
+
+    Navigator.of(context).pop(
+      _JalonFormData(
+        titre: _titreController.text.trim(),
+        description: _descriptionController
+            .text
+            .trim(),
+        ordre: ordreTexte.isEmpty
+            ? null
+            : int.tryParse(ordreTexte),
+        datePrevue: _datePrevue,
+        dateReelle: _dateReelle,
+        statut: _estModification
+            ? _statut
+            : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        _estModification
+            ? 'Modifier le jalon'
+            : 'Ajouter un jalon',
+      ),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            autovalidateMode:
+                AutovalidateMode
+                    .onUserInteraction,
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller:
+                      _titreController,
+                  textCapitalization:
+                      TextCapitalization
+                          .sentences,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Titre *',
+                    prefixIcon: Icon(
+                      Icons.flag_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null ||
+                        value
+                            .trim()
+                            .isEmpty) {
+                      return 'Le titre est obligatoire.';
+                    }
+
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller:
+                      _descriptionController,
+                  minLines: 2,
+                  maxLines: 4,
+                  textCapitalization:
+                      TextCapitalization
+                          .sentences,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Description',
+                    alignLabelWithHint: true,
+                    prefixIcon: Icon(
+                      Icons
+                          .description_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                if (!_estModification) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller:
+                        _ordreController,
+                    keyboardType:
+                        TextInputType.number,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Ordre (optionnel)',
+                      prefixIcon: Icon(
+                        Icons.sort_outlined,
+                      ),
+                      border:
+                          OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _DateSelectionTile(
+                  label: 'Date prévue',
+                  date: _datePrevue,
+                  icon:
+                      Icons.event_outlined,
+                  onTap: () {
+                    _selectionnerDate(
+                      reelle: false,
+                    );
+                  },
+                ),
+                if (_estModification) ...[
+                  const SizedBox(height: 12),
+                  _DateSelectionTile(
+                    label: 'Date réelle',
+                    date: _dateReelle,
+                    icon: Icons
+                        .event_available_outlined,
+                    onTap: () {
+                      _selectionnerDate(
+                        reelle: true,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<
+                      String>(
+                    initialValue: _statut,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Statut du jalon',
+                      prefixIcon: Icon(
+                        Icons.info_outline,
+                      ),
+                      border:
+                          OutlineInputBorder(),
+                    ),
+                    items: _statuts.entries
+                        .map(
+                          (entree) =>
+                              DropdownMenuItem(
+                            value: entree.key,
+                            child: Text(
+                              entree.value,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _statut = value;
+                      });
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: _confirmer,
+          icon: Icon(
+            _estModification
+                ? Icons.save_outlined
+                : Icons.add_outlined,
+          ),
+          label: Text(
+            _estModification
+                ? 'Enregistrer'
+                : 'Ajouter',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _DateSelectionTile
     extends StatelessWidget {
   const _DateSelectionTile({
@@ -1623,150 +2757,35 @@ class _InformationRow extends StatelessWidget {
   }
 }
 
-class _StatutContratChip
-    extends StatelessWidget {
-  const _StatutContratChip({
-    required this.statut,
+class _ArchiveChip extends StatelessWidget {
+  const _ArchiveChip({
+    required this.dateArchivage,
   });
 
-  final String statut;
+  final DateTime? dateArchivage;
 
   @override
   Widget build(BuildContext context) {
     final couleurs =
         Theme.of(context).colorScheme;
-
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final String texte;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'en_cours':
-        texte = 'En cours';
-        fond =
-            couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone =
-            Icons.play_circle_outline;
-        break;
-
-      case 'suspendu':
-        texte = 'Suspendu';
-        fond =
-            couleurs.secondaryContainer;
-        premierPlan =
-            couleurs.onSecondaryContainer;
-        icone =
-            Icons.pause_circle_outline;
-        break;
-
-      case 'termine':
-        texte = 'Terminé';
-        fond =
-            couleurs.tertiaryContainer;
-        premierPlan =
-            couleurs.onTertiaryContainer;
-        icone =
-            Icons.check_circle_outline;
-        break;
-
-      case 'resilie':
-        texte = 'Résilié';
-        fond =
-            couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone =
-            Icons.cancel_outlined;
-        break;
-
-      default:
-        texte = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut.replaceAll(
-                '_',
-                ' ',
-              );
-
-        fond = couleurs
-            .surfaceContainerHighest;
-
-        premierPlan =
-            couleurs.onSurfaceVariant;
-
-        icone =
-            Icons.info_outline;
-    }
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Chip(
-        backgroundColor: fond,
-        side: BorderSide.none,
-        avatar: Icon(
-          icone,
-          size: 18,
-          color: premierPlan,
-        ),
-        label: Text(
-          texte,
-          style: TextStyle(
-            color: premierPlan,
-            fontWeight:
-                FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatutPaiementChip
-    extends StatelessWidget {
-  const _StatutPaiementChip({
-    required this.statut,
-  });
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final estPaye =
-        statut.trim().toLowerCase() ==
-            'paye';
 
     return Chip(
-      backgroundColor: estPaye
-          ? couleurs.primaryContainer
-          : couleurs.secondaryContainer,
+      backgroundColor:
+          couleurs.errorContainer,
       side: BorderSide.none,
       avatar: Icon(
-        estPaye
-            ? Icons.check_circle_outline
-            : Icons
-                .hourglass_empty_outlined,
-        size: 17,
-        color: estPaye
-            ? couleurs.onPrimaryContainer
-            : couleurs
-                .onSecondaryContainer,
+        Icons.archive_outlined,
+        size: 18,
+        color: couleurs.onErrorContainer,
       ),
       label: Text(
-        estPaye ? 'Payé' : 'En attente',
+        dateArchivage == null
+            ? 'Archivé'
+            : 'Archivé le ${_formatDate(dateArchivage)}',
         style: TextStyle(
+          color:
+              couleurs.onErrorContainer,
           fontWeight: FontWeight.bold,
-          color: estPaye
-              ? couleurs.onPrimaryContainer
-              : couleurs
-                  .onSecondaryContainer,
         ),
       ),
     );
@@ -1790,14 +2809,8 @@ class _ErreurContrat extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -1847,10 +2860,33 @@ class _AjoutPaiementData {
   final DateTime? dateEcheance;
 }
 
+class _JalonFormData {
+  const _JalonFormData({
+    required this.titre,
+    required this.description,
+    required this.ordre,
+    required this.datePrevue,
+    required this.dateReelle,
+    required this.statut,
+  });
+
+  final String titre;
+  final String description;
+  final int? ordre;
+  final DateTime? datePrevue;
+  final DateTime? dateReelle;
+  final String? statut;
+}
+
 enum _TypeDateContrat {
   signature,
   debut,
   fin,
+}
+
+enum _ActionContrat {
+  archiver,
+  desarchiver,
 }
 
 String _formatMontant(

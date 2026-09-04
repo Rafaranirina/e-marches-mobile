@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/appel_offre.dart';
 import '../data/appel_offre_repository.dart';
 
-class AppelOffreController extends ChangeNotifier {
+class AppelOffreController extends SafeChangeNotifier {
   AppelOffreController({
     AppelOffreRepository? repository,
   }) : _repository = repository ?? AppelOffreRepository();

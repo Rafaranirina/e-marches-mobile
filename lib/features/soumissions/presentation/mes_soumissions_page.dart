@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/statut_chip.dart';
 import '../../documents/presentation/documents_page.dart';
 import '../data/soumission.dart';
 import 'mes_soumissions_controller.dart';
 import 'recepisse_dialog.dart';
+import 'soumission_statut_styles.dart';
 
 class MesSoumissionsPage extends StatelessWidget {
   const MesSoumissionsPage({super.key});
@@ -206,28 +208,46 @@ class _MesSoumissionsView extends StatelessWidget {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
-          children: const [
-            SizedBox(height: 80),
-            Icon(Icons.inbox_outlined, size: 72),
-            SizedBox(height: 16),
+          children: [
+            const SizedBox(height: 80),
+            _CercleIcone(
+              icon: Icons.inbox_outlined,
+              couleurFond:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              couleurIcone: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 20),
             Text(
               'Vous n’avez déposé aucune soumission pour le moment.',
               textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           ],
         ),
       );
     }
 
+    final nombreBrouillons = controller.soumissions
+        .where((soumission) => soumission.estBrouillon)
+        .length;
+
     return RefreshIndicator(
       onRefresh: controller.actualiser,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: controller.soumissions.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: controller.soumissions.length + 1,
+        separatorBuilder: (_, index) =>
+            index == 0 ? const SizedBox(height: 4) : const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          final soumission = controller.soumissions[index];
+          if (index == 0) {
+            return _EnteteMesSoumissions(
+              total: controller.soumissions.length,
+              brouillons: nombreBrouillons,
+            );
+          }
+
+          final soumission = controller.soumissions[index - 1];
 
           return _MaSoumissionCard(
             soumission: soumission,
@@ -247,6 +267,71 @@ class _MesSoumissionsView extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _EnteteMesSoumissions extends StatelessWidget {
+  const _EnteteMesSoumissions({
+    required this.total,
+    required this.brouillons,
+  });
+
+  final int total;
+  final int brouillons;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(
+                Icons.assignment_turned_in_outlined,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$total soumission${total > 1 ? 's' : ''}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    brouillons > 0
+                        ? '$brouillons en brouillon — à transmettre'
+                        : 'Toutes vos soumissions sont transmises',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: brouillons > 0
+                              ? scheme.tertiary
+                              : scheme.onSurfaceVariant,
+                          fontWeight:
+                              brouillons > 0 ? FontWeight.w700 : FontWeight.w400,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -293,7 +378,10 @@ class _MaSoumissionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _StatutSoumissionChip(statut: soumission.statut),
+                StatutChip(
+                  statut: soumission.statut,
+                  styles: soumissionStatutStyles,
+                ),
               ],
             ),
             if (appelOffre != null && appelOffre.isNotEmpty) ...[
@@ -303,7 +391,7 @@ class _MaSoumissionCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _Information(
               icon: Icons.payments_outlined,
               label: 'Montant proposé',
@@ -389,110 +477,38 @@ class _Information extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final texte = valeur?.trim() ?? '';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+        Icon(icon, size: 20, color: scheme.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 2),
-              Text(texte.isEmpty ? 'Non renseigné' : texte),
+              Text(
+                label.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                texte.isEmpty ? 'Non renseigné' : texte,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatutSoumissionChip extends StatelessWidget {
-  const _StatutSoumissionChip({required this.statut});
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final statutNormalise = statut.trim().toLowerCase();
-    final couleurs = Theme.of(context).colorScheme;
-
-    final String libelle;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'brouillon':
-        libelle = 'Brouillon';
-        fond = couleurs.surfaceContainerHighest;
-        premierPlan = couleurs.onSurfaceVariant;
-        icone = Icons.edit_note_outlined;
-        break;
-
-      case 'soumise':
-        libelle = 'Transmise';
-        fond = couleurs.secondaryContainer;
-        premierPlan = couleurs.onSecondaryContainer;
-        icone = Icons.schedule_outlined;
-        break;
-
-      case 'recevable':
-        libelle = 'Recevable';
-        fond = couleurs.primaryContainer;
-        premierPlan = couleurs.onPrimaryContainer;
-        icone = Icons.verified_outlined;
-        break;
-
-      case 'irrecevable':
-        libelle = 'Irrecevable';
-        fond = couleurs.errorContainer;
-        premierPlan = couleurs.onErrorContainer;
-        icone = Icons.cancel_outlined;
-        break;
-
-      case 'evaluee':
-        libelle = 'Évaluée';
-        fond = couleurs.secondaryContainer;
-        premierPlan = couleurs.onSecondaryContainer;
-        icone = Icons.fact_check_outlined;
-        break;
-
-      case 'retenue':
-        libelle = 'Retenue';
-        fond = couleurs.primaryContainer;
-        premierPlan = couleurs.onPrimaryContainer;
-        icone = Icons.emoji_events_outlined;
-        break;
-
-      case 'rejetee':
-        libelle = 'Rejetée';
-        fond = couleurs.errorContainer;
-        premierPlan = couleurs.onErrorContainer;
-        icone = Icons.block_outlined;
-        break;
-
-      default:
-        libelle = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut.replaceAll('_', ' ');
-        fond = couleurs.surfaceContainerHighest;
-        premierPlan = couleurs.onSurfaceVariant;
-        icone = Icons.info_outline;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(icone, size: 17, color: premierPlan),
-      label: Text(
-        libelle,
-        style: TextStyle(color: premierPlan, fontWeight: FontWeight.bold),
-      ),
     );
   }
 }
@@ -629,6 +645,33 @@ class _DonneesModification {
   final String? delaiExecution;
 }
 
+class _CercleIcone extends StatelessWidget {
+  const _CercleIcone({
+    required this.icon,
+    required this.couleurFond,
+    required this.couleurIcone,
+  });
+
+  final IconData icon;
+  final Color couleurFond;
+  final Color couleurIcone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 88,
+        height: 88,
+        decoration: BoxDecoration(
+          color: couleurFond,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 40, color: couleurIcone),
+      ),
+    );
+  }
+}
+
 class _Erreur extends StatelessWidget {
   const _Erreur({required this.message, required this.onRetry});
 
@@ -637,18 +680,20 @@ class _Erreur extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
+            _CercleIcone(
+              icon: Icons.error_outline,
+              couleurFond: scheme.errorContainer,
+              couleurIcone: scheme.onErrorContainer,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 24),
             FilledButton.icon(

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import '../../utilisateurs/data/utilisateur_gestion.dart';
 
 class ParametresRepository {
@@ -275,45 +276,17 @@ class ParametresRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData = error.response?.data;
-
-    if (responseData is Map) {
-      final message = responseData['message']?.toString().trim();
-
-      if (message != null && message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.receiveTimeout ||
-        error.type == DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type == DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Mot de passe incorrect ou session expirée.';
-
-      case 404:
-        return 'Ressource introuvable.';
-
-      case 409:
-        return 'Cette opération a déjà été effectuée.';
-
-      case 413:
-        return 'Le fichier sélectionné est trop volumineux.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        401: 'Mot de passe incorrect ou session expirée.',
+        404: 'Ressource introuvable.',
+        409: 'Cette opération a déjà été effectuée.',
+        413: 'Le fichier sélectionné est trop volumineux.',
+      },
+    );
   }
 
   static String? _nullableString(String? valeur) {

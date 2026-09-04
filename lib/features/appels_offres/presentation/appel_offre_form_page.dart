@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
 import '../data/appel_offre.dart';
 import '../data/appel_offre_referentiels.dart';
 import '../data/appel_offre_repository.dart';
@@ -806,11 +807,8 @@ class _ErreurReferentiels extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 60,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,

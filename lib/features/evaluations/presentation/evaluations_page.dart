@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/classement_soumission.dart';
 import '../../../shared/models/commission.dart';
+import '../../../shared/widgets/circle_icon.dart';
 import '../../../shared/widgets/statut_chip.dart';
 import 'evaluation_controller.dart';
 
@@ -1079,14 +1080,8 @@ class _ErreurEvaluations
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -1125,11 +1120,8 @@ class _ClassementVide extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          const Icon(
-            Icons.leaderboard_outlined,
-            size: 72,
-          ),
-          const SizedBox(height: 16),
+          CircleIcon.neutre(context, icon: Icons.leaderboard_outlined),
+          const SizedBox(height: 20),
           Text(
             'Aucune soumission disponible dans le classement.',
             textAlign: TextAlign.center,

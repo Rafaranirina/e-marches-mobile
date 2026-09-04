@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../shared/network/dio_error_mapper.dart';
 import 'rapport_tableau_bord.dart';
 
 class RapportRepository {
@@ -22,11 +23,20 @@ class RapportRepository {
       final activitesRecentes =
           await chargerActiviteRecente();
 
+      final transparence =
+          await chargerTransparence();
+
+      final activiteMensuelle =
+          await chargerActiviteMensuelle();
+
       return RapportTableauBordData(
         statistiques: statistiques,
         topEntreprises: topEntreprises,
         activitesRecentes:
             activitesRecentes,
+        transparence: transparence,
+        activiteMensuelle:
+            activiteMensuelle,
       );
     } on RapportException {
       rethrow;
@@ -144,6 +154,74 @@ class RapportRepository {
     }
   }
 
+  Future<IndicateursTransparence>
+      chargerTransparence() async {
+    try {
+      final response = await _dio.get(
+        '/api/dashboard/transparence',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      final transparence = _convertirMap(
+        data['transparence'],
+      );
+
+      return IndicateursTransparence
+          .fromJson(transparence);
+    } on DioException catch (error) {
+      throw RapportException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger les indicateurs de transparence.',
+        ),
+      );
+    } on RapportException {
+      rethrow;
+    } catch (_) {
+      throw const RapportException(
+        'Les indicateurs de transparence reçus sont invalides.',
+      );
+    }
+  }
+
+  Future<List<ActiviteMensuelle>>
+      chargerActiviteMensuelle() async {
+    try {
+      final response = await _dio.get(
+        '/api/dashboard/activite-mensuelle',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      final activiteMensuelle =
+          _convertirListe(
+        data['activite_mensuelle'],
+      );
+
+      return activiteMensuelle
+          .map(ActiviteMensuelle.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw RapportException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger l’activité mensuelle.',
+        ),
+      );
+    } on RapportException {
+      rethrow;
+    } catch (_) {
+      throw const RapportException(
+        'L’activité mensuelle reçue est invalide.',
+      );
+    }
+  }
+
   Map<String, dynamic> _convertirMap(
     dynamic valeur,
   ) {
@@ -187,51 +265,14 @@ class RapportRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType
-                .connectionTimeout ||
-        error.type ==
-            DioExceptionType
-                .receiveTimeout ||
-        error.type ==
-            DioExceptionType
-                .sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à consulter ces rapports.';
-
-      case 404:
-        return 'Le service de rapports est introuvable.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        403: 'Vous n’êtes pas autorisé à consulter ces rapports.',
+        404: 'Le service de rapports est introuvable.',
+      },
+    );
   }
 }
 
@@ -240,11 +281,15 @@ class RapportTableauBordData {
     required this.statistiques,
     required this.topEntreprises,
     required this.activitesRecentes,
+    required this.transparence,
+    required this.activiteMensuelle,
   });
 
   final StatistiquesTableauBord statistiques;
   final List<TopEntreprise> topEntreprises;
   final List<ActiviteRecente> activitesRecentes;
+  final IndicateursTransparence transparence;
+  final List<ActiviteMensuelle> activiteMensuelle;
 }
 
 class RapportException implements Exception {

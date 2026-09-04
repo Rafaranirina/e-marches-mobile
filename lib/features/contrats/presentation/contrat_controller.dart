@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/contrat.dart';
 import '../data/contrat_repository.dart';
 
-class ContratController extends ChangeNotifier {
+class ContratController extends SafeChangeNotifier {
   ContratController({
     ContratRepository? repository,
   }) : _repository =

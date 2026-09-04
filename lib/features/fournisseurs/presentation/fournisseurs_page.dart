@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/fournisseur.dart';
 import 'fournisseur_controller.dart';
+import 'fournisseur_detail_page.dart';
 
 class FournisseursPage extends StatelessWidget {
   const FournisseursPage({super.key});
@@ -11,7 +13,8 @@ class FournisseursPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => FournisseurController()..charger(),
+      create: (_) => FournisseurController()
+        ..charger(),
       child: const _FournisseursView(),
     );
   }
@@ -27,7 +30,8 @@ class _FournisseursView extends StatefulWidget {
 
 class _FournisseursViewState
     extends State<_FournisseursView> {
-  final TextEditingController _rechercheController =
+  final TextEditingController
+      _rechercheController =
       TextEditingController();
 
   @override
@@ -36,12 +40,218 @@ class _FournisseursViewState
     super.dispose();
   }
 
-  void _effacerRecherche() {
+  Future<void> _creerFournisseur() async {
+    final donnees = await showDialog<
+        DonneesCreationFournisseur>(
+      context: context,
+      builder: (_) =>
+          const FournisseurFormDialog(),
+    );
+
+    if (donnees == null || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<FournisseurController>();
+
+    final resultat =
+        await controller.creerFournisseur(
+      donnees,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de créer le fournisseur.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _modifierFournisseur(
+    Fournisseur fournisseur,
+  ) async {
+    final donnees = await showDialog<
+        DonneesModificationFournisseur>(
+      context: context,
+      builder: (_) => FournisseurEditDialog(
+        fournisseur: fournisseur,
+      ),
+    );
+
+    if (donnees == null || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<FournisseurController>();
+
+    final resultat =
+        await controller.modifierFournisseur(
+      fournisseur: fournisseur,
+      donnees: donnees,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier le fournisseur.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _changerStatut(
+    Fournisseur fournisseur,
+  ) async {
+    final resultatDialogue = await showDialog<
+        StatutFournisseurResultat>(
+      context: context,
+      builder: (_) => FournisseurStatutDialog(
+        fournisseur: fournisseur,
+      ),
+    );
+
+    if (resultatDialogue == null ||
+        !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<FournisseurController>();
+
+    final resultat =
+        await controller.changerStatut(
+      fournisseur: fournisseur,
+      statut: resultatDialogue.statut,
+      motif: resultatDialogue.motif,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de modifier le statut.',
+      estErreur: resultat == null,
+    );
+  }
+
+  Future<void> _validerRapide(
+    Fournisseur fournisseur,
+  ) async {
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Valider l’entreprise',
+          ),
+          content: Text(
+            'Confirmez-vous la validation de '
+            '« ${fournisseur.raisonSociale} » ? '
+            'Les comptes fournisseurs en attente '
+            'liés à cette entreprise seront '
+            'également activés.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext)
+                      .pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext)
+                      .pop(true),
+              child: const Text('Valider'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmation != true || !mounted) {
+      return;
+    }
+
+    final controller =
+        context.read<FournisseurController>();
+
+    final resultat =
+        await controller.changerStatut(
+      fournisseur: fournisseur,
+      statut: 'actif',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _afficherMessage(
+      resultat?.message ??
+          controller.errorMessage ??
+          'Impossible de valider cette entreprise.',
+      estErreur: resultat == null,
+    );
+  }
+
+  void _ouvrirDetail(
+    Fournisseur fournisseur,
+  ) {
+    final controller =
+        context.read<FournisseurController>();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ChangeNotifierProvider.value(
+          value: controller,
+          child: FournisseurDetailPage(
+            fournisseurId: fournisseur.id,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _reinitialiserFiltres() {
     _rechercheController.clear();
 
     context
         .read<FournisseurController>()
-        .effacerRecherche();
+        .reinitialiserFiltres();
+  }
+
+  void _afficherMessage(
+    String message, {
+    bool estErreur = false,
+  }) {
+    final messenger =
+        ScaffoldMessenger.of(context);
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: estErreur
+              ? Theme.of(context)
+                  .colorScheme
+                  .error
+              : null,
+          content: Text(message),
+        ),
+      );
   }
 
   @override
@@ -55,13 +265,26 @@ class _FournisseursViewState
             ?.estAdministrateurNational ??
         false;
 
+    final fournisseurs =
+        controller.fournisseursFiltres;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fournisseurs'),
         actions: [
+          if (estAdminNational)
+            IconButton(
+              tooltip: 'Créer un fournisseur',
+              onPressed: controller.isBusy
+                  ? null
+                  : _creerFournisseur,
+              icon: const Icon(
+                Icons.add_business_outlined,
+              ),
+            ),
           IconButton(
             tooltip: 'Actualiser',
-            onPressed: controller.isLoading
+            onPressed: controller.isBusy
                 ? null
                 : controller.actualiser,
             icon: const Icon(
@@ -69,14 +292,60 @@ class _FournisseursViewState
             ),
           ),
         ],
+        bottom: controller.isRefreshing ||
+                controller.isCreating
+            ? const PreferredSize(
+                preferredSize:
+                    Size.fromHeight(3),
+                child:
+                    LinearProgressIndicator(),
+              )
+            : null,
       ),
+      floatingActionButton:
+          estAdminNational &&
+                  !controller.isLoading
+              ? FloatingActionButton.extended(
+                  onPressed: controller.isBusy
+                      ? null
+                      : _creerFournisseur,
+                  icon: const Icon(
+                    Icons.add_business_outlined,
+                  ),
+                  label: const Text(
+                    'Nouveau fournisseur',
+                  ),
+                )
+              : null,
       body: SafeArea(
         child: Column(
           children: [
-            _buildEntete(controller),
+            _EnteteFournisseurs(
+              nombreTotal:
+                  controller.nombreTotal,
+              nombreActifs:
+                  controller.nombreActifs,
+              nombreEnAttente:
+                  controller.nombreEnAttente,
+              nombreSuspendus:
+                  controller.nombreSuspendus,
+            ),
+            _FiltresFournisseurs(
+              rechercheController:
+                  _rechercheController,
+              statutSelectionne:
+                  controller.filtreStatut,
+              onRecherche:
+                  controller.rechercher,
+              onStatut:
+                  controller.filtrerParStatut,
+              onReinitialiser:
+                  _reinitialiserFiltres,
+            ),
             Expanded(
               child: _buildContenu(
                 controller,
+                fournisseurs,
                 estAdminNational,
               ),
             ),
@@ -86,95 +355,9 @@ class _FournisseursViewState
     );
   }
 
-  Widget _buildEntete(
-    FournisseurController controller,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        8,
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.business_outlined,
-                    size: 36,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Fournisseurs enregistrés',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${controller.nombreTotal} fournisseur${controller.nombreTotal > 1 ? 's' : ''}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _rechercheController,
-            textInputAction:
-                TextInputAction.search,
-            onChanged: controller.rechercher,
-            decoration: InputDecoration(
-              labelText:
-                  'Rechercher un fournisseur',
-              hintText:
-                  'Raison sociale, NIF, STAT ou statut',
-              prefixIcon:
-                  const Icon(Icons.search),
-              suffixIcon:
-                  _rechercheController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip:
-                              'Effacer la recherche',
-                          onPressed:
-                              _effacerRecherche,
-                          icon: const Icon(
-                            Icons.clear,
-                          ),
-                        ),
-              border:
-                  const OutlineInputBorder(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildContenu(
     FournisseurController controller,
+    List<Fournisseur> fournisseurs,
     bool estAdminNational,
   ) {
     if (controller.isLoading) {
@@ -183,7 +366,8 @@ class _FournisseursViewState
       );
     }
 
-    if (controller.hasError) {
+    if (controller.hasError &&
+        controller.fournisseurs.isEmpty) {
       return _ErreurFournisseurs(
         message: controller.errorMessage ??
             'Impossible de charger les fournisseurs.',
@@ -191,14 +375,16 @@ class _FournisseursViewState
       );
     }
 
-    final fournisseurs =
-        controller.fournisseurs;
+    if (controller.fournisseurs.isEmpty) {
+      return _FournisseursVides(
+        filtreActif: false,
+        onActualiser: controller.actualiser,
+      );
+    }
 
     if (fournisseurs.isEmpty) {
-      return _ListeVide(
-        rechercheActive:
-            controller.recherche.trim().isNotEmpty,
-        onEffacerRecherche: _effacerRecherche,
+      return _FournisseursVides(
+        filtreActif: true,
         onActualiser: controller.actualiser,
       );
     }
@@ -212,73 +398,35 @@ class _FournisseursViewState
           16,
           8,
           16,
-          24,
+          110,
         ),
         itemCount: fournisseurs.length,
         separatorBuilder: (_, _) =>
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
         itemBuilder: (context, index) {
-          final fournisseur = fournisseurs[index];
+          final fournisseur =
+              fournisseurs[index];
 
           return _FournisseurCard(
             fournisseur: fournisseur,
-            peutValider: estAdminNational,
-            validationEnCours:
-                controller.validationEnCours(fournisseur.id),
-            onValider: () async {
-              final confirmation = await showDialog<bool>(
-                context: context,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    title: const Text('Valider l’entreprise'),
-                    content: Text(
-                      'Confirmez-vous la validation de « ${fournisseur.raisonSociale} » ? '
-                      'Les comptes fournisseurs en attente liés à cette entreprise seront également activés.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(false),
-                        child: const Text('Annuler'),
-                      ),
-                      FilledButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(true),
-                        child: const Text('Valider'),
-                      ),
-                    ],
-                  );
-                },
+            estAdminNational:
+                estAdminNational,
+            actionEnCours:
+                controller.actionEnCoursPour(
+              fournisseur.id,
+            ),
+            onTap: () =>
+                _ouvrirDetail(fournisseur),
+            onModifier: () {
+              _modifierFournisseur(
+                fournisseur,
               );
-
-              if (confirmation != true || !context.mounted) {
-                return;
-              }
-
-              final message = await controller.validerEntreprise(
-                fournisseur.id,
-              );
-
-              if (!context.mounted) {
-                return;
-              }
-
-              final messenger = ScaffoldMessenger.of(context);
-
-              messenger
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    backgroundColor: message == null
-                        ? Theme.of(context).colorScheme.error
-                        : null,
-                    content: Text(
-                      message ??
-                          controller.errorMessage ??
-                          'Impossible de valider cette entreprise.',
-                    ),
-                  ),
-                );
+            },
+            onChangerStatut: () {
+              _changerStatut(fournisseur);
+            },
+            onValiderRapide: () {
+              _validerRapide(fournisseur);
             },
           );
         },
@@ -287,106 +435,428 @@ class _FournisseursViewState
   }
 }
 
-class _FournisseurCard extends StatelessWidget {
-  const _FournisseurCard({
-    required this.fournisseur,
-    required this.peutValider,
-    required this.validationEnCours,
-    required this.onValider,
+class _EnteteFournisseurs
+    extends StatelessWidget {
+  const _EnteteFournisseurs({
+    required this.nombreTotal,
+    required this.nombreActifs,
+    required this.nombreEnAttente,
+    required this.nombreSuspendus,
   });
 
-  final Fournisseur fournisseur;
-  final bool peutValider;
-  final bool validationEnCours;
-  final VoidCallback onValider;
+  final int nombreTotal;
+  final int nombreActifs;
+  final int nombreEnAttente;
+  final int nombreSuspendus;
 
   @override
   Widget build(BuildContext context) {
-    final estEnAttente =
-        fournisseur.statutValidation?.trim().toLowerCase() ==
-            'en_attente';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  child: Text(
-                    _initiale(
-                      fournisseur.raisonSociale,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        8,
+      ),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 26,
+                    child: Icon(
+                      Icons.business_outlined,
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    fournisseur.raisonSociale,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      '$nombreTotal fournisseur'
+                      '${nombreTotal > 1 ? 's' : ''}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                _StatutValidationChip(
-                  statut:
-                      fournisseur.statutValidation,
-                ),
-              ],
-            ),
-            const Divider(height: 28),
-            _InformationFournisseur(
-              icon: Icons.badge_outlined,
-              label: 'NIF',
-              valeur: fournisseur.nif,
-            ),
-            const SizedBox(height: 12),
-            _InformationFournisseur(
-              icon: Icons.numbers_outlined,
-              label: 'STAT',
-              valeur: fournisseur.stat,
-            ),
-            const SizedBox(height: 12),
-            _InformationFournisseur(
-              icon: Icons.event_outlined,
-              label: 'Date d’inscription',
-              valeur: _formatDate(
-                fournisseur.dateCreation,
+                ],
               ),
-            ),
-            if (peutValider && estEnAttente) ...[
-              const Divider(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: validationEnCours
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    : FilledButton.icon(
-                        onPressed: onValider,
-                        icon: const Icon(
-                          Icons.verified_outlined,
-                        ),
-                        label: const Text(
-                          'Valider l’entreprise',
-                        ),
-                      ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _CompteurChip(
+                    label: 'Actifs',
+                    valeur: nombreActifs,
+                    icon:
+                        Icons.check_circle_outline,
+                  ),
+                  _CompteurChip(
+                    label: 'En attente',
+                    valeur: nombreEnAttente,
+                    icon:
+                        Icons.hourglass_empty_outlined,
+                  ),
+                  _CompteurChip(
+                    label: 'Suspendus',
+                    valeur: nombreSuspendus,
+                    icon:
+                        Icons.pause_circle_outline,
+                  ),
+                ],
               ),
             ],
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompteurChip extends StatelessWidget {
+  const _CompteurChip({
+    required this.label,
+    required this.valeur,
+    required this.icon,
+  });
+
+  final String label;
+  final int valeur;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text('$label : $valeur'),
+    );
+  }
+}
+
+class _FiltresFournisseurs
+    extends StatelessWidget {
+  const _FiltresFournisseurs({
+    required this.rechercheController,
+    required this.statutSelectionne,
+    required this.onRecherche,
+    required this.onStatut,
+    required this.onReinitialiser,
+  });
+
+  final TextEditingController
+      rechercheController;
+
+  final String statutSelectionne;
+
+  final ValueChanged<String> onRecherche;
+  final ValueChanged<String> onStatut;
+  final VoidCallback onReinitialiser;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        8,
+      ),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              TextField(
+                controller:
+                    rechercheController,
+                onChanged: onRecherche,
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Rechercher un fournisseur',
+                  hintText:
+                      'Raison sociale, NIF, STAT ou e-mail',
+                  prefixIcon: Icon(
+                    Icons.search_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child:
+                        DropdownButtonFormField<
+                            String>(
+                      initialValue:
+                          statutSelectionne,
+                      decoration:
+                          const InputDecoration(
+                        labelText: 'Statut',
+                        prefixIcon: Icon(
+                          Icons.info_outline,
+                        ),
+                        border:
+                            OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'tous',
+                          child: Text(
+                            'Tous les statuts',
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'actif',
+                          child: Text('Actif'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'en_attente',
+                          child: Text(
+                            'En attente',
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'inactif',
+                          child:
+                              Text('Inactif'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'suspendu',
+                          child: Text(
+                            'Suspendu',
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          onStatut(value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    tooltip:
+                        'Réinitialiser les filtres',
+                    onPressed:
+                        onReinitialiser,
+                    icon: const Icon(
+                      Icons
+                          .filter_alt_off_outlined,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _ActionFournisseur {
+  modifier,
+  statut,
+  validerRapide,
+}
+
+class _FournisseurCard extends StatelessWidget {
+  const _FournisseurCard({
+    required this.fournisseur,
+    required this.estAdminNational,
+    required this.actionEnCours,
+    required this.onTap,
+    required this.onModifier,
+    required this.onChangerStatut,
+    required this.onValiderRapide,
+  });
+
+  final Fournisseur fournisseur;
+  final bool estAdminNational;
+  final bool actionEnCours;
+
+  final VoidCallback onTap;
+  final VoidCallback onModifier;
+  final VoidCallback onChangerStatut;
+  final VoidCallback onValiderRapide;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    child: Text(
+                      _initiale(
+                        fournisseur
+                            .raisonSociale,
+                      ),
+                      style: const TextStyle(
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      fournisseur.raisonSociale,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                  if (actionEnCours)
+                    const Padding(
+                      padding:
+                          EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  else if (estAdminNational)
+                    PopupMenuButton<
+                        _ActionFournisseur>(
+                      tooltip: 'Actions',
+                      onSelected: (action) {
+                        switch (action) {
+                          case _ActionFournisseur
+                                .modifier:
+                            onModifier();
+                            break;
+
+                          case _ActionFournisseur
+                                .statut:
+                            onChangerStatut();
+                            break;
+
+                          case _ActionFournisseur
+                                .validerRapide:
+                            onValiderRapide();
+                            break;
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value:
+                              _ActionFournisseur
+                                  .modifier,
+                          child: ListTile(
+                            contentPadding:
+                                EdgeInsets.zero,
+                            leading: Icon(
+                              Icons.edit_outlined,
+                            ),
+                            title: Text(
+                              'Modifier les coordonnées',
+                            ),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value:
+                              _ActionFournisseur
+                                  .statut,
+                          child: ListTile(
+                            contentPadding:
+                                EdgeInsets.zero,
+                            leading: Icon(
+                              Icons
+                                  .published_with_changes_outlined,
+                            ),
+                            title: Text(
+                              'Changer le statut',
+                            ),
+                          ),
+                        ),
+                        if (fournisseur
+                            .estEnAttente)
+                          const PopupMenuItem(
+                            value:
+                                _ActionFournisseur
+                                    .validerRapide,
+                            child: ListTile(
+                              contentPadding:
+                                  EdgeInsets.zero,
+                              leading: Icon(
+                                Icons
+                                    .verified_outlined,
+                              ),
+                              title: Text(
+                                'Valider rapidement',
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  StatutFournisseurChip(
+                    statut: fournisseur
+                        .statutValidation,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _InformationFournisseur(
+                icon: Icons.badge_outlined,
+                label: 'NIF',
+                valeur: fournisseur.nif,
+              ),
+              const SizedBox(height: 10),
+              _InformationFournisseur(
+                icon: Icons.numbers_outlined,
+                label: 'STAT',
+                valeur: fournisseur.stat,
+              ),
+              const SizedBox(height: 10),
+              _InformationFournisseur(
+                icon: Icons.event_outlined,
+                label: 'Date d’inscription',
+                valeur: formatDateFournisseur(
+                  fournisseur.dateCreation,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -395,27 +865,9 @@ class _FournisseurCard extends StatelessWidget {
   static String _initiale(String valeur) {
     final texte = valeur.trim();
 
-    if (texte.isEmpty) {
-      return '?';
-    }
-
-    return texte.substring(0, 1).toUpperCase();
-  }
-
-  static String _formatDate(DateTime? date) {
-    if (date == null) {
-      return 'Non renseignée';
-    }
-
-    final dateLocale = date.toLocal();
-
-    final jour =
-        dateLocale.day.toString().padLeft(2, '0');
-
-    final mois =
-        dateLocale.month.toString().padLeft(2, '0');
-
-    return '$jour/$mois/${dateLocale.year}';
+    return texte.isEmpty
+        ? '?'
+        : texte.substring(0, 1).toUpperCase();
   }
 }
 
@@ -441,30 +893,16 @@ class _InformationFournisseur
       children: [
         Icon(
           icon,
-          size: 21,
+          size: 19,
           color: Theme.of(context)
               .colorScheme
               .primary,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                texte.isEmpty
-                    ? 'Non renseigné'
-                    : texte,
-              ),
-            ],
+          child: Text(
+            '$label : '
+            '${texte.isEmpty ? 'Non renseigné' : texte}',
           ),
         ),
       ],
@@ -472,10 +910,13 @@ class _InformationFournisseur
   }
 }
 
-class _StatutValidationChip
+/// Chip de statut d'une entreprise, réutilisé par la page de liste et
+/// la page de détail des fournisseurs.
+class StatutFournisseurChip
     extends StatelessWidget {
-  const _StatutValidationChip({
+  const StatutFournisseurChip({
     required this.statut,
+    super.key,
   });
 
   final String? statut;
@@ -488,78 +929,750 @@ class _StatutValidationChip
     final couleurs =
         Theme.of(context).colorScheme;
 
-    final String libelle;
     final Color fond;
-    final Color premierPlan;
-    final IconData icone;
+    final Color texte;
+    final IconData icon;
 
     switch (statutNormalise) {
-      // Valeurs réelles confirmées côté backend (type Postgres
-      // `statut_compte`, identique à `utilisateurs.statut`) :
-      // en_attente / actif / inactif / suspendu.
       case 'actif':
-        libelle = 'Actif';
         fond = couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone = Icons.verified_outlined;
-        break;
-
-      case 'suspendu':
-        libelle = 'Suspendu';
-        fond = couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone = Icons.pause_circle_outline;
-        break;
-
-      case 'inactif':
-        libelle = 'Inactif';
-        fond = couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone = Icons.cancel_outlined;
+        texte = couleurs.onPrimaryContainer;
+        icon = Icons.check_circle_outline;
         break;
 
       case 'en_attente':
-        libelle = 'En attente';
         fond = couleurs.secondaryContainer;
-        premierPlan =
+        texte =
             couleurs.onSecondaryContainer;
-        icone = Icons.schedule_outlined;
+        icon =
+            Icons.hourglass_empty_outlined;
+        break;
+
+      case 'suspendu':
+        fond = couleurs.errorContainer;
+        texte = couleurs.onErrorContainer;
+        icon = Icons.pause_circle_outline;
+        break;
+
+      case 'inactif':
+        fond = couleurs.errorContainer;
+        texte = couleurs.onErrorContainer;
+        icon = Icons.cancel_outlined;
         break;
 
       default:
-        libelle = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut!
-                .replaceAll('_', ' ')
-                .trim();
-
         fond =
             couleurs.surfaceContainerHighest;
-
-        premierPlan =
-            couleurs.onSurfaceVariant;
-
-        icone = Icons.info_outline;
+        texte = couleurs.onSurfaceVariant;
+        icon = Icons.block_outlined;
     }
 
     return Chip(
       backgroundColor: fond,
       side: BorderSide.none,
-      avatar: Icon(
-        icone,
-        size: 17,
-        color: premierPlan,
-      ),
+      avatar: Icon(icon, size: 17, color: texte),
       label: Text(
-        libelle,
+        formaterStatutFournisseur(statut),
         style: TextStyle(
-          color: premierPlan,
+          color: texte,
           fontWeight: FontWeight.bold,
         ),
       ),
+    );
+  }
+}
+
+/// Formulaire de création manuelle d'un fournisseur
+/// (`POST /api/entreprises`, réservé à `admin_national`). Seule la
+/// raison sociale est obligatoire côté backend.
+class FournisseurFormDialog
+    extends StatefulWidget {
+  const FournisseurFormDialog({super.key});
+
+  @override
+  State<FournisseurFormDialog>
+      createState() =>
+          _FournisseurFormDialogState();
+}
+
+class _FournisseurFormDialogState
+    extends State<FournisseurFormDialog> {
+  final GlobalKey<FormState> _formKey =
+      GlobalKey<FormState>();
+
+  final TextEditingController
+      _raisonSocialeController =
+      TextEditingController();
+
+  final TextEditingController
+      _nifController = TextEditingController();
+
+  final TextEditingController
+      _statController = TextEditingController();
+
+  final TextEditingController
+      _rcsController = TextEditingController();
+
+  final TextEditingController
+      _adresseController =
+      TextEditingController();
+
+  final TextEditingController
+      _telephoneController =
+      TextEditingController();
+
+  final TextEditingController
+      _emailController =
+      TextEditingController();
+
+  final TextEditingController
+      _representantLegalController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _raisonSocialeController.dispose();
+    _nifController.dispose();
+    _statController.dispose();
+    _rcsController.dispose();
+    _adresseController.dispose();
+    _telephoneController.dispose();
+    _emailController.dispose();
+    _representantLegalController
+        .dispose();
+    super.dispose();
+  }
+
+  void _confirmer() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      DonneesCreationFournisseur(
+        raisonSociale:
+            _raisonSocialeController.text
+                .trim(),
+        nif: _nifController.text.trim(),
+        stat: _statController.text.trim(),
+        rcs: _rcsController.text.trim(),
+        adresse:
+            _adresseController.text.trim(),
+        telephone: _telephoneController.text
+            .trim(),
+        email:
+            _emailController.text.trim(),
+        representantLegal:
+            _representantLegalController
+                .text
+                .trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Créer un fournisseur',
+      ),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            autovalidateMode:
+                AutovalidateMode
+                    .onUserInteraction,
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller:
+                      _raisonSocialeController,
+                  textCapitalization:
+                      TextCapitalization.words,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Raison sociale *',
+                    prefixIcon: Icon(
+                      Icons.business_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null ||
+                        value.trim().isEmpty) {
+                      return 'La raison sociale est obligatoire.';
+                    }
+
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _nifController,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'NIF',
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _statController,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'STAT',
+                    prefixIcon: Icon(
+                      Icons.numbers_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _rcsController,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'RCS',
+                    prefixIcon: Icon(
+                      Icons.numbers_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _adresseController,
+                  maxLines: 2,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Adresse',
+                    prefixIcon: Icon(
+                      Icons
+                          .location_on_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _telephoneController,
+                  keyboardType:
+                      TextInputType.phone,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Téléphone',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _emailController,
+                  keyboardType:
+                      TextInputType.emailAddress,
+                  autocorrect: false,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Adresse e-mail',
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final texte =
+                        value?.trim() ?? '';
+
+                    if (texte.isEmpty) {
+                      return null;
+                    }
+
+                    final valide = RegExp(
+                      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                    ).hasMatch(texte);
+
+                    return valide
+                        ? null
+                        : 'L’adresse e-mail est invalide.';
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _representantLegalController,
+                  textCapitalization:
+                      TextCapitalization.words,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Représentant légal',
+                    prefixIcon: Icon(
+                      Icons.person_outline,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Annuler'),
+        ),
+        FilledButton.icon(
+          onPressed: _confirmer,
+          icon: const Icon(
+            Icons.add_business_outlined,
+          ),
+          label: const Text('Créer'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Formulaire de modification des coordonnées d'un fournisseur
+/// (`PUT /api/entreprises/:id`, réservé à `admin_national`) : seules
+/// l'adresse, le téléphone, l'e-mail et le représentant légal restent
+/// modifiables après la création — la raison sociale et les
+/// identifiants légaux (NIF/STAT/RCS) restent figés.
+class FournisseurEditDialog
+    extends StatefulWidget {
+  const FournisseurEditDialog({
+    required this.fournisseur,
+    super.key,
+  });
+
+  final Fournisseur fournisseur;
+
+  @override
+  State<FournisseurEditDialog>
+      createState() =>
+          _FournisseurEditDialogState();
+}
+
+class _FournisseurEditDialogState
+    extends State<FournisseurEditDialog> {
+  final GlobalKey<FormState> _formKey =
+      GlobalKey<FormState>();
+
+  late final TextEditingController
+      _adresseController;
+
+  late final TextEditingController
+      _telephoneController;
+
+  late final TextEditingController
+      _emailController;
+
+  late final TextEditingController
+      _representantLegalController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _adresseController =
+        TextEditingController(
+      text: widget.fournisseur.adresse ?? '',
+    );
+
+    _telephoneController =
+        TextEditingController(
+      text:
+          widget.fournisseur.telephone ?? '',
+    );
+
+    _emailController = TextEditingController(
+      text: widget.fournisseur.email ?? '',
+    );
+
+    _representantLegalController =
+        TextEditingController(
+      text: widget.fournisseur
+              .representantLegal ??
+          '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _adresseController.dispose();
+    _telephoneController.dispose();
+    _emailController.dispose();
+    _representantLegalController
+        .dispose();
+    super.dispose();
+  }
+
+  void _confirmer() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      DonneesModificationFournisseur(
+        adresse:
+            _adresseController.text.trim(),
+        telephone: _telephoneController.text
+            .trim(),
+        email:
+            _emailController.text.trim(),
+        representantLegal:
+            _representantLegalController
+                .text
+                .trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        'Modifier « '
+        '${widget.fournisseur.raisonSociale}'
+        ' »',
+      ),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            autovalidateMode:
+                AutovalidateMode
+                    .onUserInteraction,
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller:
+                      _adresseController,
+                  maxLines: 2,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Adresse',
+                    prefixIcon: Icon(
+                      Icons
+                          .location_on_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _telephoneController,
+                  keyboardType:
+                      TextInputType.phone,
+                  decoration:
+                      const InputDecoration(
+                    labelText: 'Téléphone',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _emailController,
+                  keyboardType:
+                      TextInputType.emailAddress,
+                  autocorrect: false,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Adresse e-mail',
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final texte =
+                        value?.trim() ?? '';
+
+                    if (texte.isEmpty) {
+                      return null;
+                    }
+
+                    final valide = RegExp(
+                      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                    ).hasMatch(texte);
+
+                    return valide
+                        ? null
+                        : 'L’adresse e-mail est invalide.';
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller:
+                      _representantLegalController,
+                  textCapitalization:
+                      TextCapitalization.words,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Représentant légal',
+                    prefixIcon: Icon(
+                      Icons.person_outline,
+                    ),
+                    border:
+                        OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Annuler'),
+        ),
+        FilledButton.icon(
+          onPressed: _confirmer,
+          icon: const Icon(
+            Icons.save_outlined,
+          ),
+          label: const Text('Enregistrer'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Valeur retournée par [FournisseurStatutDialog].
+class StatutFournisseurResultat {
+  const StatutFournisseurResultat({
+    required this.statut,
+    this.motif,
+  });
+
+  final String statut;
+  final String? motif;
+}
+
+/// Sélecteur complet de statut d'une entreprise
+/// (`PATCH /api/entreprises/:id/statut`, réservé à `admin_national`).
+/// Le backend exige un motif pour suspendre ou désactiver une
+/// entreprise.
+class FournisseurStatutDialog
+    extends StatefulWidget {
+  const FournisseurStatutDialog({
+    required this.fournisseur,
+    super.key,
+  });
+
+  final Fournisseur fournisseur;
+
+  @override
+  State<FournisseurStatutDialog>
+      createState() =>
+          _FournisseurStatutDialogState();
+}
+
+class _FournisseurStatutDialogState
+    extends State<FournisseurStatutDialog> {
+  final GlobalKey<FormState> _formKey =
+      GlobalKey<FormState>();
+
+  late String _statut;
+
+  final TextEditingController
+      _motifController =
+      TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    final statutActuel = widget.fournisseur
+        .statutValidation
+        ?.trim()
+        .toLowerCase();
+
+    _statut = Fournisseur.statutsAutorises
+            .contains(statutActuel)
+        ? statutActuel!
+        : 'en_attente';
+  }
+
+  @override
+  void dispose() {
+    _motifController.dispose();
+    super.dispose();
+  }
+
+  bool get _motifObligatoire =>
+      _statut == 'suspendu' ||
+      _statut == 'inactif';
+
+  void _confirmer() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      StatutFournisseurResultat(
+        statut: _statut,
+        motif: _motifController.text
+                .trim()
+                .isEmpty
+            ? null
+            : _motifController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Changer le statut'),
+      content: SizedBox(
+        width: 460,
+        child: Form(
+          key: _formKey,
+          autovalidateMode:
+              AutovalidateMode
+                  .onUserInteraction,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.fournisseur
+                    .raisonSociale,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _statut,
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Nouveau statut',
+                  prefixIcon: Icon(
+                    Icons
+                        .published_with_changes_outlined,
+                  ),
+                  border:
+                      OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'actif',
+                    child: Text('Actif'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'en_attente',
+                    child:
+                        Text('En attente'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'inactif',
+                    child: Text('Inactif'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'suspendu',
+                    child: Text('Suspendu'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _statut = value;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _motifController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: _motifObligatoire
+                      ? 'Motif *'
+                      : 'Motif (optionnel)',
+                  helperText:
+                      'Obligatoire pour suspendre ou désactiver.',
+                  prefixIcon: const Icon(
+                    Icons.notes_outlined,
+                  ),
+                  border:
+                      const OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (_motifObligatoire &&
+                      (value ?? '')
+                          .trim()
+                          .isEmpty) {
+                    return 'Un motif est obligatoire pour ce statut.';
+                  }
+
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: _confirmer,
+          child: const Text('Confirmer'),
+        ),
+      ],
     );
   }
 }
@@ -582,14 +1695,8 @@ class _ErreurFournisseurs
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -598,11 +1705,9 @@ class _ErreurFournisseurs
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(
-                Icons.refresh,
+                Icons.refresh_outlined,
               ),
-              label: const Text(
-                'Réessayer',
-              ),
+              label: const Text('Réessayer'),
             ),
           ],
         ),
@@ -611,15 +1716,14 @@ class _ErreurFournisseurs
   }
 }
 
-class _ListeVide extends StatelessWidget {
-  const _ListeVide({
-    required this.rechercheActive,
-    required this.onEffacerRecherche,
+class _FournisseursVides
+    extends StatelessWidget {
+  const _FournisseursVides({
+    required this.filtreActif,
     required this.onActualiser,
   });
 
-  final bool rechercheActive;
-  final VoidCallback onEffacerRecherche;
+  final bool filtreActif;
   final Future<void> Function() onActualiser;
 
   @override
@@ -632,37 +1736,60 @@ class _ListeVide extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 70),
-          const Icon(
-            Icons.business_outlined,
-            size: 72,
+          CircleIcon.neutre(
+            context,
+            icon: filtreActif
+                ? Icons.search_off_outlined
+                : Icons.business_outlined,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
-            rechercheActive
-                ? 'Aucun fournisseur ne correspond à la recherche.'
+            filtreActif
+                ? 'Aucun fournisseur ne correspond aux filtres.'
                 : 'Aucun fournisseur enregistré.',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
                 .titleMedium,
           ),
-          if (rechercheActive) ...[
-            const SizedBox(height: 20),
-            Center(
-              child: OutlinedButton.icon(
-                onPressed:
-                    onEffacerRecherche,
-                icon: const Icon(
-                  Icons.clear,
-                ),
-                label: const Text(
-                  'Effacer la recherche',
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
+}
+
+String formatDateFournisseur(
+  DateTime? date, {
+  bool avecHeure = false,
+}) {
+  if (date == null) {
+    return 'Non renseignée';
+  }
+
+  final dateLocale = date.toLocal();
+
+  final jour = dateLocale.day
+      .toString()
+      .padLeft(2, '0');
+
+  final mois = dateLocale.month
+      .toString()
+      .padLeft(2, '0');
+
+  final base =
+      '$jour/$mois/${dateLocale.year}';
+
+  if (!avecHeure) {
+    return base;
+  }
+
+  final heure = dateLocale.hour
+      .toString()
+      .padLeft(2, '0');
+
+  final minute = dateLocale.minute
+      .toString()
+      .padLeft(2, '0');
+
+  return '$base à $heure:$minute';
 }

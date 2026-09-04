@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../documents/presentation/documents_page.dart';
 import '../data/soumission.dart';
 import 'soumission_controller.dart';
+import 'soumission_statut_styles.dart';
 
 class SoumissionsPage extends StatelessWidget {
   const SoumissionsPage({
@@ -273,49 +275,51 @@ class _EnteteSoumissions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     final referenceAffichee =
         reference.trim().isEmpty
             ? 'Appel d’offres'
             : reference;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        8,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
             children: [
-              const CircleAvatar(
-                radius: 25,
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Icon(
                   Icons.assignment_turned_in_outlined,
+                  color: scheme.primary,
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       referenceAffichee,
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
-                          ?.copyWith(
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
-                      '$nombre soumission'
-                      '${nombre > 1 ? 's' : ''}',
+                      '$nombre soumission${nombre > 1 ? 's' : ''} reçue${nombre > 1 ? 's' : ''}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -379,12 +383,13 @@ class _SoumissionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _StatutSoumissionChip(
+                StatutChip(
                   statut: soumission.statut,
+                  styles: soumissionStatutStyles,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _InformationSoumission(
               icon: Icons.business_outlined,
               label: 'Entreprise',
@@ -525,6 +530,7 @@ class _InformationSoumission
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final texte = valeur?.trim() ?? '';
 
     return Row(
@@ -533,10 +539,8 @@ class _InformationSoumission
       children: [
         Icon(
           icon,
-          size: 21,
-          color: Theme.of(context)
-              .colorScheme
-              .primary,
+          size: 20,
+          color: scheme.primary,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -545,132 +549,30 @@ class _InformationSoumission
                 CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                label.toUpperCase(),
                 style: Theme.of(context)
                     .textTheme
-                    .labelLarge,
+                    .labelSmall
+                    ?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 texte.isEmpty
                     ? 'Non renseigné'
                     : texte,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatutSoumissionChip
-    extends StatelessWidget {
-  const _StatutSoumissionChip({
-    required this.statut,
-  });
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final String libelle;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'brouillon':
-        libelle = 'Brouillon';
-        fond = couleurs.surfaceContainerHighest;
-        premierPlan =
-            couleurs.onSurfaceVariant;
-        icone = Icons.edit_note_outlined;
-        break;
-
-      case 'recevable':
-        libelle = 'Recevable';
-        fond = couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone = Icons.verified_outlined;
-        break;
-
-      case 'irrecevable':
-        libelle = 'Irrecevable';
-        fond = couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone = Icons.cancel_outlined;
-        break;
-
-      case 'soumise':
-        libelle = 'Soumise';
-        fond = couleurs.secondaryContainer;
-        premierPlan =
-            couleurs.onSecondaryContainer;
-        icone = Icons.schedule_outlined;
-        break;
-
-      case 'evaluee':
-        libelle = 'Évaluée';
-        fond = couleurs.secondaryContainer;
-        premierPlan =
-            couleurs.onSecondaryContainer;
-        icone = Icons.fact_check_outlined;
-        break;
-
-      case 'retenue':
-        libelle = 'Retenue';
-        fond = couleurs.primaryContainer;
-        premierPlan =
-            couleurs.onPrimaryContainer;
-        icone = Icons.emoji_events_outlined;
-        break;
-
-      case 'rejetee':
-        libelle = 'Rejetée';
-        fond = couleurs.errorContainer;
-        premierPlan =
-            couleurs.onErrorContainer;
-        icone = Icons.block_outlined;
-        break;
-
-      default:
-        libelle = statutNormalise.isEmpty
-            ? 'Non défini'
-            : statut.replaceAll('_', ' ');
-
-        fond =
-            couleurs.surfaceContainerHighest;
-
-        premierPlan =
-            couleurs.onSurfaceVariant;
-
-        icone = Icons.info_outline;
-    }
-
-    return Chip(
-      backgroundColor: fond,
-      side: BorderSide.none,
-      avatar: Icon(
-        icone,
-        size: 17,
-        color: premierPlan,
-      ),
-      label: Text(
-        libelle,
-        style: TextStyle(
-          color: premierPlan,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 }
@@ -686,20 +588,28 @@ class _ErreurSoumissions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: scheme.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 40,
+                color: scheme.onErrorContainer,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -731,6 +641,8 @@ class _ListeSoumissionsVide
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return RefreshIndicator(
       onRefresh: onActualiser,
       child: ListView(
@@ -739,18 +651,30 @@ class _ListeSoumissionsVide
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          const Icon(
-            Icons.inbox_outlined,
-            size: 72,
+          Container(
+            width: 88,
+            height: 88,
+            margin: const EdgeInsets.symmetric(horizontal: 0),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.inbox_outlined,
+              size: 40,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Aucune soumission déposée pour '
-            'cet appel d’offres.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium,
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              'Aucune soumission déposée pour '
+              'cet appel d’offres.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium,
+            ),
           ),
         ],
       ),

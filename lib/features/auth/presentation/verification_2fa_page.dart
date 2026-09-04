@@ -22,6 +22,11 @@ class _Verification2FAPageState extends State<Verification2FAPage> {
     super.dispose();
   }
 
+  void _annuler() {
+    context.read<AuthController>().annulerDeuxFacteurs();
+    Navigator.of(context).pop();
+  }
+
   Future<void> _valider() async {
     FocusScope.of(context).unfocus();
 
@@ -132,6 +137,15 @@ class _Verification2FAPageState extends State<Verification2FAPage> {
                         authController.isLoading
                             ? 'Vérification...'
                             : 'Valider',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: authController.isLoading
+                          ? null
+                          : _annuler,
+                      child: const Text(
+                        'Annuler et revenir à la connexion',
                       ),
                     ),
                   ],

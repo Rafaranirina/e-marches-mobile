@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart';
+import '../../../shared/presentation/safe_change_notifier.dart';
 
 import '../data/classement_soumission.dart';
 import '../../../shared/models/commission.dart';
 import '../data/commission_repository.dart';
 import '../data/evaluation_repository.dart';
 
-class EvaluationController extends ChangeNotifier {
+class EvaluationController extends SafeChangeNotifier {
   EvaluationController({
     required this.appelOffreId,
     EvaluationRepository? evaluationRepository,

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../shared/models/commission.dart';
+import '../../../shared/network/dio_error_mapper.dart';
+import 'ma_commission.dart';
 
 class CommissionRepository {
   CommissionRepository({
@@ -184,6 +186,87 @@ class CommissionRepository {
     }
   }
 
+  Future<ActionRetraitMembreResult>
+      retirerMembre({
+    required String commissionId,
+    required String utilisateurId,
+  }) async {
+    final id = commissionId.trim();
+    final membreId = utilisateurId.trim();
+
+    if (id.isEmpty) {
+      throw const CommissionException(
+        'La commission sélectionnée est invalide.',
+      );
+    }
+
+    if (membreId.isEmpty) {
+      throw const CommissionException(
+        'Le membre sélectionné est invalide.',
+      );
+    }
+
+    try {
+      final response = await _dio.delete(
+        '/api/commissions/$id/membres/$membreId',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ActionRetraitMembreResult(
+        message: _extraireMessageReponse(
+          data,
+          'Membre retiré de la commission avec succès.',
+        ),
+      );
+    } on DioException catch (error) {
+      throw CommissionException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de retirer le membre.',
+        ),
+      );
+    } on CommissionException {
+      rethrow;
+    } catch (_) {
+      throw const CommissionException(
+        'La réponse du serveur est invalide.',
+      );
+    }
+  }
+
+  Future<ListeMesCommissionsResult>
+      listerMesCommissions() async {
+    try {
+      final response = await _dio.get(
+        '/api/commissions/mes-commissions',
+      );
+
+      final data = _convertirMap(
+        response.data,
+      );
+
+      return ListeMesCommissionsResult.fromJson(
+        data,
+      );
+    } on DioException catch (error) {
+      throw CommissionException(
+        _extraireMessageErreur(
+          error,
+          'Impossible de charger vos commissions.',
+        ),
+      );
+    } on CommissionException {
+      rethrow;
+    } catch (_) {
+      throw const CommissionException(
+        'La liste de vos commissions reçue est invalide.',
+      );
+    }
+  }
+
   Map<String, dynamic> _convertirMap(
     dynamic valeur,
   ) {
@@ -214,57 +297,16 @@ class CommissionRepository {
     DioException error,
     String messageParDefaut,
   ) {
-    final responseData =
-        error.response?.data;
-
-    if (responseData is Map) {
-      final message =
-          responseData['message']
-              ?.toString()
-              .trim();
-
-      if (message != null &&
-          message.isNotEmpty) {
-        return message;
-      }
-    }
-
-    if (error.type ==
-            DioExceptionType.connectionTimeout ||
-        error.type ==
-            DioExceptionType.receiveTimeout ||
-        error.type ==
-            DioExceptionType.sendTimeout) {
-      return 'Le serveur met trop de temps à répondre.';
-    }
-
-    if (error.type ==
-        DioExceptionType.connectionError) {
-      return 'Connexion au serveur impossible.';
-    }
-
-    switch (error.response?.statusCode) {
-      case 400:
-        return 'Les informations transmises sont invalides.';
-
-      case 401:
-        return 'Votre session a expiré. Reconnectez-vous.';
-
-      case 403:
-        return 'Vous n’êtes pas autorisé à effectuer cette opération.';
-
-      case 404:
-        return 'La commission ou l’appel d’offres est introuvable.';
-
-      case 409:
-        return 'Ce membre fait déjà partie de la commission.';
-
-      case 500:
-        return 'Une erreur interne est survenue sur le serveur.';
-
-      default:
-        return messageParDefaut;
-    }
+    return extraireMessageErreur(
+      error,
+      messageParDefaut,
+      messagesParStatut: const {
+        400: 'Les informations transmises sont invalides.',
+        403: 'Vous n’êtes pas autorisé à effectuer cette opération.',
+        404: 'La commission ou l’appel d’offres est introuvable.',
+        409: 'Ce membre fait déjà partie de la commission.',
+      },
+    );
   }
 }
 
@@ -286,6 +328,14 @@ class ActionMembreCommissionResult {
 
   final String message;
   final MembreCommission? membre;
+}
+
+class ActionRetraitMembreResult {
+  const ActionRetraitMembreResult({
+    required this.message,
+  });
+
+  final String message;
 }
 
 class CommissionException implements Exception {

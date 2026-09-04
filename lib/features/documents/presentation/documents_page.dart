@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
 import '../data/document_marche.dart';
 import 'document_controller.dart';
 
@@ -52,6 +53,7 @@ class _DocumentsView extends StatefulWidget {
 class _DocumentsViewState
     extends State<_DocumentsView> {
   String? _documentEnTelechargementId;
+  String? _documentEnRemplacementId;
 
   Future<void> _ajouterDocument() async {
     final controller =
@@ -231,6 +233,153 @@ class _DocumentsViewState
     }
   }
 
+  Future<void> _remplacerDocument(
+    DocumentMarche document,
+  ) async {
+    final controller =
+        context.read<DocumentController>();
+
+    if (controller.isBusy) {
+      return;
+    }
+
+    controller.effacerErreur();
+
+    try {
+      final resultatSelection =
+          await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.any,
+        withData: false,
+      );
+
+      if (resultatSelection == null ||
+          resultatSelection.files.isEmpty ||
+          !mounted) {
+        return;
+      }
+
+      final fichier =
+          resultatSelection.files.single;
+
+      final cheminFichier =
+          fichier.path?.trim() ?? '';
+
+      if (cheminFichier.isEmpty) {
+        _afficherMessage(
+          'Le chemin du fichier sélectionné '
+          'est indisponible.',
+          estErreur: true,
+        );
+        return;
+      }
+
+      final commentaire =
+          await showDialog<String>(
+        context: context,
+        builder: (_) =>
+            _CommentaireVersionDialog(
+          nomFichier: fichier.name,
+        ),
+      );
+
+      if (commentaire == null ||
+          !mounted) {
+        return;
+      }
+
+      setState(() {
+        _documentEnRemplacementId =
+            document.id;
+      });
+
+      final resultat = await controller
+          .televerserNouvelleVersion(
+        documentId: document.id,
+        cheminFichier: cheminFichier,
+        commentaireVersion:
+            commentaire.trim().isEmpty
+                ? null
+                : commentaire.trim(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (resultat == null) {
+        _afficherMessage(
+          controller.errorMessage ??
+              'Impossible de téléverser la nouvelle version.',
+          estErreur: true,
+        );
+        return;
+      }
+
+      _afficherMessage(
+        resultat.message.trim().isEmpty
+            ? 'Nouvelle version téléversée avec succès.'
+            : resultat.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _afficherMessage(
+        'Impossible de sélectionner ou '
+        'de téléverser le fichier.',
+        estErreur: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _documentEnRemplacementId = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _afficherHistorique(
+    DocumentMarche document,
+  ) async {
+    final controller =
+        context.read<DocumentController>();
+
+    controller.effacerErreur();
+
+    final historique =
+        controller.obtenirHistorique(
+      document.id,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _HistoriqueVersionsDialog(
+        nomFichier: document.nomFichier,
+        historique: historique,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (controller.hasError) {
+      _afficherMessage(
+        controller.errorMessage ??
+            'Impossible de récupérer '
+                'l’historique des versions.',
+        estErreur: true,
+      );
+      controller.effacerErreur();
+    }
+  }
+
   void _afficherMessage(
     String message, {
     bool estErreur = false,
@@ -371,8 +520,23 @@ class _DocumentsViewState
             enTelechargement:
                 _documentEnTelechargementId ==
                     document.id,
+            enRemplacement:
+                _documentEnRemplacementId ==
+                    document.id,
+            actionsDesactivees:
+                controller.isBusy,
             onTelecharger: () {
               _telechargerDocument(
+                document,
+              );
+            },
+            onRemplacer: () {
+              _remplacerDocument(
+                document,
+              );
+            },
+            onHistorique: () {
+              _afficherHistorique(
                 document,
               );
             },
@@ -387,12 +551,20 @@ class _DocumentCard extends StatelessWidget {
   const _DocumentCard({
     required this.document,
     required this.enTelechargement,
+    required this.enRemplacement,
+    required this.actionsDesactivees,
     required this.onTelecharger,
+    required this.onRemplacer,
+    required this.onHistorique,
   });
 
   final DocumentMarche document;
   final bool enTelechargement;
+  final bool enRemplacement;
+  final bool actionsDesactivees;
   final VoidCallback onTelecharger;
+  final VoidCallback onRemplacer;
+  final VoidCallback onHistorique;
 
   @override
   Widget build(BuildContext context) {
@@ -483,6 +655,17 @@ class _DocumentCard extends StatelessWidget {
                     document.tailleFormatee,
                   ),
                 ),
+                if (document.version != null)
+                  Chip(
+                    avatar: const Icon(
+                      Icons
+                          .layers_outlined,
+                      size: 17,
+                    ),
+                    label: Text(
+                      'Version ${document.version}',
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 14),
@@ -507,31 +690,70 @@ class _DocumentCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed:
-                    enTelechargement
-                        ? null
-                        : onTelecharger,
-                icon: enTelechargement
-                    ? const SizedBox(
-                        width: 19,
-                        height: 19,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.download_outlined,
-                      ),
-                label: Text(
-                  enTelechargement
-                      ? 'Préparation...'
-                      : 'Télécharger',
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed:
+                        enTelechargement
+                            ? null
+                            : onTelecharger,
+                    icon: enTelechargement
+                        ? const SizedBox(
+                            width: 19,
+                            height: 19,
+                            child:
+                                CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons
+                                .download_outlined,
+                          ),
+                    label: Text(
+                      enTelechargement
+                          ? 'Préparation...'
+                          : 'Télécharger',
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                IconButton.outlined(
+                  tooltip:
+                      'Historique des versions',
+                  onPressed:
+                      actionsDesactivees
+                          ? null
+                          : onHistorique,
+                  icon: const Icon(
+                    Icons.history_outlined,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton.outlined(
+                  tooltip:
+                      'Remplacer par une nouvelle version',
+                  onPressed:
+                      enRemplacement ||
+                              actionsDesactivees
+                          ? null
+                          : onRemplacer,
+                  icon: enRemplacement
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons
+                              .publish_outlined,
+                        ),
+                ),
+              ],
             ),
           ],
         ),
@@ -673,6 +895,343 @@ class _TypeDocumentDialogState
   }
 }
 
+class _CommentaireVersionDialog
+    extends StatefulWidget {
+  const _CommentaireVersionDialog({
+    required this.nomFichier,
+  });
+
+  final String nomFichier;
+
+  @override
+  State<_CommentaireVersionDialog>
+      createState() =>
+          _CommentaireVersionDialogState();
+}
+
+class _CommentaireVersionDialogState
+    extends State<_CommentaireVersionDialog> {
+  final TextEditingController
+      _commentaireController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _commentaireController.dispose();
+    super.dispose();
+  }
+
+  void _confirmer() {
+    Navigator.of(context).pop(
+      _commentaireController.text.trim(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Remplacer le document',
+      ),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Nouvelle version sélectionnée',
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.nomFichier,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller:
+                  _commentaireController,
+              textCapitalization:
+                  TextCapitalization.sentences,
+              maxLines: 3,
+              decoration:
+                  const InputDecoration(
+                labelText:
+                    'Commentaire de version',
+                hintText:
+                    'Exemple : Correction des annexes',
+                helperText:
+                    'Ce champ est facultatif.',
+                prefixIcon: Icon(
+                  Icons.comment_outlined,
+                ),
+                border:
+                    OutlineInputBorder(),
+              ),
+              onSubmitted: (_) {
+                _confirmer();
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text(
+            'Annuler',
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: _confirmer,
+          icon: const Icon(
+            Icons.publish_outlined,
+          ),
+          label: const Text(
+            'Remplacer',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoriqueVersionsDialog
+    extends StatelessWidget {
+  const _HistoriqueVersionsDialog({
+    required this.nomFichier,
+    required this.historique,
+  });
+
+  final String nomFichier;
+  final Future<List<DocumentVersion>?> historique;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Historique des versions',
+      ),
+      content: SizedBox(
+        width: 480,
+        child: FutureBuilder<
+            List<DocumentVersion>?>(
+          future: historique,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState !=
+                ConnectionState.done) {
+              return const SizedBox(
+                height: 120,
+                child: Center(
+                  child:
+                      CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            final versions = snapshot.data;
+
+            if (snapshot.hasError ||
+                versions == null) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: 24,
+                ),
+                child: Text(
+                  'Impossible de récupérer '
+                  'l’historique des versions.',
+                ),
+              );
+            }
+
+            if (versions.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: 24,
+                ),
+                child: Text(
+                  'Aucun historique disponible '
+                  'pour ce document.',
+                ),
+              );
+            }
+
+            final versionsRecentesDabord =
+                versions.reversed.toList();
+
+            return SizedBox(
+              width: double.maxFinite,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount:
+                    versionsRecentesDabord
+                        .length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 24),
+                itemBuilder: (context, index) {
+                  final version =
+                      versionsRecentesDabord[
+                          index];
+
+                  return _VersionHistoriqueTile(
+                    version: version,
+                    estActuelle: index == 0,
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Fermer'),
+        ),
+      ],
+    );
+  }
+}
+
+class _VersionHistoriqueTile
+    extends StatelessWidget {
+  const _VersionHistoriqueTile({
+    required this.version,
+    required this.estActuelle,
+  });
+
+  final DocumentVersion version;
+  final bool estActuelle;
+
+  @override
+  Widget build(BuildContext context) {
+    final commentaire =
+        version.commentaireVersion
+                ?.trim() ??
+            '';
+
+    final uploadePar =
+        version.uploadePar?.trim() ?? '';
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              child: Text(
+                'v${version.version ?? '?'}',
+                style: const TextStyle(
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          version.nomFichier
+                                  .trim()
+                                  .isEmpty
+                              ? 'Document sans nom'
+                              : version
+                                  .nomFichier,
+                          style: Theme.of(
+                            context,
+                          )
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                              ),
+                        ),
+                      ),
+                      if (estActuelle)
+                        Padding(
+                          padding:
+                              const EdgeInsets
+                                  .only(
+                            left: 8,
+                          ),
+                          child: Chip(
+                            visualDensity:
+                                VisualDensity
+                                    .compact,
+                            label: const Text(
+                              'Actuelle',
+                            ),
+                            backgroundColor:
+                                Theme.of(
+                              context,
+                            )
+                                    .colorScheme
+                                    .primaryContainer,
+                            labelStyle: TextStyle(
+                              color: Theme.of(
+                                context,
+                              )
+                                  .colorScheme
+                                  .onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_formatDate(version.dateUpload)} • '
+                    '${version.tailleFormatee}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall,
+                  ),
+                  if (commentaire.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(commentaire),
+                  ],
+                  if (uploadePar.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Téléversé par : '
+                      '$uploadePar',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _ErreurDocuments
     extends StatelessWidget {
   const _ErreurDocuments({
@@ -692,14 +1251,8 @@ class _ErreurDocuments
           mainAxisSize:
               MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign:
@@ -745,11 +1298,8 @@ class _ListeDocumentsVide
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 80),
-          const Icon(
-            Icons.folder_open_outlined,
-            size: 72,
-          ),
-          const SizedBox(height: 16),
+          CircleIcon.neutre(context, icon: Icons.folder_open_outlined),
+          const SizedBox(height: 20),
           Text(
             'Aucun document disponible.',
             textAlign: TextAlign.center,

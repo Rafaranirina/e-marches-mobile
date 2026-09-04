@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/statut_chip.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../commissions/presentation/commissions_page.dart';
 import '../../evaluations/presentation/evaluations_page.dart';
@@ -9,9 +10,11 @@ import '../../soumissions/data/soumission_repository.dart';
 import '../../soumissions/presentation/soumission_form_page.dart';
 import '../../soumissions/presentation/soumissions_page.dart';
 import '../data/appel_offre.dart';
+import '../data/appel_offre_historique.dart';
 import '../data/appel_offre_repository.dart';
 import '../data/appel_offre_transitions.dart';
 import 'appel_offre_form_page.dart';
+import 'appel_offre_statut_styles.dart';
 
 class AppelOffreDetailsPage extends StatefulWidget {
   const AppelOffreDetailsPage({
@@ -490,6 +493,23 @@ class _AppelOffreDetailsPageState
     await _actualiser();
   }
 
+  Future<void> _afficherHistorique() async {
+    if (_isBusy) {
+      return;
+    }
+
+    final historique = _repository.obtenirHistorique(
+      _appelOffre.id,
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _HistoriqueDialog(
+        historique: historique,
+      ),
+    );
+  }
+
   Future<void> _deposerSoumission() async {
     if (_isBusy) {
       return;
@@ -700,10 +720,12 @@ class _AppelOffreDetailsPageState
                         CrossAxisAlignment
                             .start,
                     children: [
-                      _StatutChip(
-                        statut:
-                            _appelOffre
-                                .statut,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: StatutChip(
+                          statut: _appelOffre.statut,
+                          styles: appelOffreStatutStyles,
+                        ),
                       ),
                       const SizedBox(
                         height: 16,
@@ -863,6 +885,35 @@ class _AppelOffreDetailsPageState
                             .bodyLarge,
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets
+                          .symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                  leading: const CircleAvatar(
+                    child: Icon(
+                      Icons.history_outlined,
+                    ),
+                  ),
+                  title: const Text(
+                    'Historique des statuts',
+                  ),
+                  subtitle: const Text(
+                    'Consulter les changements de statut de cet appel d’offres',
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                  ),
+                  onTap: _isBusy
+                      ? null
+                      : _afficherHistorique,
+                ),
               ),
               if (peutVoirSoumissions) ...[
                 const SizedBox(
@@ -1389,137 +1440,218 @@ class _InformationRow
   }
 }
 
-class _StatutChip
-    extends StatelessWidget {
-  const _StatutChip({
-    required this.statut,
+class _HistoriqueDialog extends StatelessWidget {
+  const _HistoriqueDialog({
+    required this.historique,
   });
 
-  final String statut;
+  final Future<List<AppelOffreHistorique>> historique;
 
   @override
   Widget build(BuildContext context) {
-    final couleur =
-        Theme.of(context)
-            .colorScheme;
-
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final String texte;
-    final Color fond;
-    final Color premierPlan;
-    final IconData icone;
-
-    switch (statutNormalise) {
-      case 'brouillon':
-        texte = 'Brouillon';
-        fond =
-            couleur.secondaryContainer;
-        premierPlan =
-            couleur.onSecondaryContainer;
-        icone =
-            Icons.edit_note_outlined;
-        break;
-
-      case 'publie':
-        texte = 'Publié';
-        fond =
-            couleur.primaryContainer;
-        premierPlan =
-            couleur.onPrimaryContainer;
-        icone =
-            Icons.public_outlined;
-        break;
-
-      case 'cloture':
-        texte = 'Clôturé';
-        fond =
-            couleur.tertiaryContainer;
-        premierPlan =
-            couleur.onTertiaryContainer;
-        icone =
-            Icons.event_busy_outlined;
-        break;
-
-      case 'en_evaluation':
-        texte = 'En évaluation';
-        fond =
-            couleur.tertiaryContainer;
-        premierPlan =
-            couleur.onTertiaryContainer;
-        icone =
-            Icons.leaderboard_outlined;
-        break;
-
-      case 'attribue':
-        texte = 'Attribué';
-        fond =
-            couleur.primaryContainer;
-        premierPlan =
-            couleur.onPrimaryContainer;
-        icone =
-            Icons.verified_outlined;
-        break;
-
-      case 'infructueux':
-        texte = 'Infructueux';
-        fond =
-            couleur.errorContainer;
-        premierPlan =
-            couleur.onErrorContainer;
-        icone =
-            Icons.block_outlined;
-        break;
-
-      case 'annule':
-        texte = 'Annulé';
-        fond =
-            couleur.errorContainer;
-        premierPlan =
-            couleur.onErrorContainer;
-        icone =
-            Icons.cancel_outlined;
-        break;
-
-      default:
-        texte = statut.trim().isEmpty
-            ? 'Non défini'
-            : statut.replaceAll(
-                '_',
-                ' ',
+    return AlertDialog(
+      title: const Text(
+        'Historique des statuts',
+      ),
+      content: SizedBox(
+        width: 480,
+        child: FutureBuilder<
+            List<AppelOffreHistorique>>(
+          future: historique,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState !=
+                ConnectionState.done) {
+              return const SizedBox(
+                height: 120,
+                child: Center(
+                  child:
+                      CircularProgressIndicator(),
+                ),
               );
+            }
 
-        fond = couleur
-            .surfaceContainerHighest;
+            if (snapshot.hasError) {
+              final erreur = snapshot.error;
 
-        premierPlan =
-            couleur.onSurfaceVariant;
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(
+                  vertical: 24,
+                ),
+                child: Text(
+                  erreur is AppelOffreException
+                      ? erreur.message
+                      : 'Impossible de récupérer '
+                          'l’historique de l’appel '
+                          'd’offres.',
+                ),
+              );
+            }
 
-        icone =
-            Icons.info_outline;
-    }
+            final entrees = snapshot.data ?? [];
 
-    return Align(
-      alignment:
-          Alignment.centerLeft,
-      child: Chip(
-        backgroundColor: fond,
-        side: BorderSide.none,
-        avatar: Icon(
-          icone,
-          size: 18,
-          color: premierPlan,
-        ),
-        label: Text(
-          texte,
-          style: TextStyle(
-            color: premierPlan,
-            fontWeight:
-                FontWeight.bold,
-          ),
+            if (entrees.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: 24,
+                ),
+                child: Text(
+                  'Aucun historique disponible '
+                  'pour cet appel d’offres.',
+                ),
+              );
+            }
+
+            return SizedBox(
+              width: double.maxFinite,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: entrees.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 24),
+                itemBuilder: (context, index) {
+                  return _HistoriqueTile(
+                    entree: entrees[index],
+                  );
+                },
+              ),
+            );
+          },
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Fermer'),
+        ),
+      ],
     );
+  }
+}
+
+class _HistoriqueTile extends StatelessWidget {
+  const _HistoriqueTile({
+    required this.entree,
+  });
+
+  final AppelOffreHistorique entree;
+
+  @override
+  Widget build(BuildContext context) {
+    final motif = entree.motif?.trim() ?? '';
+
+    final auteur =
+        entree.modifieParNom?.trim() ?? '';
+
+    final role = entree.modifieParRole?.trim() ??
+        '';
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(
+                top: 2,
+              ),
+              child: Icon(
+                Icons.circle,
+                size: 12,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entree.ancienStatut == null
+                        ? 'Création : '
+                            '${libelleStatutAppelOffre(
+                            entree.nouveauStatut,
+                          )}'
+                        : '${libelleStatutAppelOffre(
+                            entree.ancienStatut!,
+                          )} → '
+                            '${libelleStatutAppelOffre(
+                            entree.nouveauStatut,
+                          )}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(
+                          fontWeight:
+                              FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _AppelOffreDetailsPageState
+                        ._formatDate(
+                      entree.dateModification,
+                    ),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall,
+                  ),
+                  if (motif.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text('Motif : $motif'),
+                  ],
+                  if (auteur.isNotEmpty ||
+                      role.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      auteur.isEmpty
+                          ? _libelleRole(role)
+                          : role.isEmpty
+                              ? auteur
+                              : '$auteur '
+                                  '(${_libelleRole(
+                                  role,
+                                )})',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static String _libelleRole(String role) {
+    switch (role.trim().toLowerCase()) {
+      case 'admin_national':
+        return 'Administrateur national';
+
+      case 'administration':
+        return 'Administration';
+
+      case 'commission':
+        return 'Commission';
+
+      case 'fournisseur':
+        return 'Fournisseur';
+
+      default:
+        final valeur =
+            role.replaceAll('_', ' ').trim();
+
+        return valeur.isEmpty
+            ? 'Non défini'
+            : valeur;
+    }
   }
 }

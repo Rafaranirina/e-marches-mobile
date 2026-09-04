@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/circle_icon.dart';
+import '../../../shared/widgets/statut_chip.dart';
+import '../../appels_offres/presentation/appel_offre_statut_styles.dart';
 import '../data/rapport_tableau_bord.dart';
 import 'rapport_controller.dart';
 
@@ -115,6 +118,16 @@ class _RapportsView extends StatelessWidget {
             montant: controller
                 .statistiques
                 .montantTotalContrats,
+          ),
+          const SizedBox(height: 16),
+          _TransparenceCard(
+            transparence:
+                controller.transparence,
+          ),
+          const SizedBox(height: 16),
+          _ActiviteMensuelleCard(
+            activite: controller
+                .activiteMensuelle,
           ),
           const SizedBox(height: 16),
           _RepartitionCard(
@@ -414,6 +427,449 @@ class _MontantContratsCard
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TransparenceCard extends StatelessWidget {
+  const _TransparenceCard({
+    required this.transparence,
+  });
+
+  final IndicateursTransparence transparence;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            const _TitreSectionSansCompteur(
+              titre:
+                  'Indicateurs de transparence',
+              icone:
+                  Icons.policy_outlined,
+            ),
+            const Divider(height: 28),
+            LayoutBuilder(
+              builder:
+                  (context, contraintes) {
+                final largeur =
+                    contraintes.maxWidth;
+
+                final largeurCarte =
+                    largeur >= 700
+                        ? (largeur - 24) / 3
+                        : largeur >= 480
+                            ? (largeur - 12) /
+                                2
+                            : largeur;
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Délai moyen d’attribution',
+                        valeur: _formatJours(
+                          transparence
+                              .delaiMoyenAttributionJours,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Marchés attribués',
+                        valeur: transparence
+                            .nombreMarchesAttribues
+                            .toString(),
+                      ),
+                    ),
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Offres par marché en moyenne',
+                        valeur: _formatNombre(
+                          transparence
+                              .moyenneSoumissionsParMarche,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Taux d’infructueux',
+                        valeur: _formatPourcent(
+                          transparence
+                              .tauxInfructueuxPourcent,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Taux de mono-offre',
+                        valeur: _formatPourcent(
+                          transparence
+                              .tauxMonoOffrePourcent,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: largeurCarte,
+                      child: _IndicateurTile(
+                        titre:
+                            'Marchés infructueux',
+                        valeur: transparence
+                            .nombreInfructueux
+                            .toString(),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IndicateurTile extends StatelessWidget {
+  const _IndicateurTile({
+    required this.titre,
+    required this.valeur,
+  });
+
+  final String titre;
+  final String valeur;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant,
+        ),
+        borderRadius:
+            BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Text(
+              valeur,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              titre,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiviteMensuelleCard
+    extends StatelessWidget {
+  const _ActiviteMensuelleCard({
+    required this.activite,
+  });
+
+  final List<ActiviteMensuelle> activite;
+
+  static const _hauteurMaximaleBarre = 130.0;
+  static const _hauteurMinimaleBarre = 4.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final maximum = activite.isEmpty
+        ? 0
+        : activite
+            .expand(
+              (element) => [
+                element.publiees,
+                element.cloturees,
+              ],
+            )
+            .reduce(
+              (valeurA, valeurB) =>
+                  valeurA > valeurB
+                      ? valeurA
+                      : valeurB,
+            );
+
+    final couleurs =
+        Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            _TitreSection(
+              titre:
+                  'Activité des 12 derniers mois',
+              icone:
+                  Icons.show_chart_outlined,
+              compteur: activite.length,
+            ),
+            const Divider(height: 28),
+            if (activite.isEmpty)
+              const _MessageVide(
+                message:
+                    'Aucune donnée d’activité mensuelle disponible.',
+              )
+            else ...[
+              SizedBox(
+                height: 190,
+                child: SingleChildScrollView(
+                  scrollDirection:
+                      Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .end,
+                    children: activite
+                        .map(
+                          (mois) => Padding(
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 6,
+                            ),
+                            child: Column(
+                              mainAxisSize:
+                                  MainAxisSize
+                                      .min,
+                              children: [
+                                Row(
+                                  mainAxisSize:
+                                      MainAxisSize
+                                          .min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .end,
+                                  children: [
+                                    _BarreActivite(
+                                      hauteur:
+                                          _hauteurBarre(
+                                        mois.publiees,
+                                        maximum,
+                                      ),
+                                      couleur:
+                                          couleurs
+                                              .primary,
+                                    ),
+                                    const SizedBox(
+                                      width: 4,
+                                    ),
+                                    _BarreActivite(
+                                      hauteur:
+                                          _hauteurBarre(
+                                        mois.cloturees,
+                                        maximum,
+                                      ),
+                                      couleur:
+                                          couleurs
+                                              .tertiary,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(
+                                  height: 8,
+                                ),
+                                Text(
+                                  _libelleMois(
+                                    mois
+                                        .moisDebut,
+                                  ),
+                                  textAlign:
+                                      TextAlign
+                                          .center,
+                                  style: Theme.of(
+                                    context,
+                                  )
+                                      .textTheme
+                                      .bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _LegendeActivite(
+                    couleur:
+                        couleurs.primary,
+                    texte: 'Publiés',
+                  ),
+                  const SizedBox(width: 20),
+                  _LegendeActivite(
+                    couleur:
+                        couleurs.tertiary,
+                    texte: 'Clôturés',
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _hauteurBarre(
+    int valeur,
+    int maximum,
+  ) {
+    if (maximum <= 0 || valeur <= 0) {
+      return _hauteurMinimaleBarre;
+    }
+
+    final hauteur =
+        (valeur / maximum) *
+            _hauteurMaximaleBarre;
+
+    return hauteur < _hauteurMinimaleBarre
+        ? _hauteurMinimaleBarre
+        : hauteur;
+  }
+}
+
+class _BarreActivite extends StatelessWidget {
+  const _BarreActivite({
+    required this.hauteur,
+    required this.couleur,
+  });
+
+  final double hauteur;
+  final Color couleur;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: hauteur.round().toString(),
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 300,
+        ),
+        width: 14,
+        height: hauteur,
+        decoration: BoxDecoration(
+          color: couleur,
+          borderRadius:
+              BorderRadius.circular(4),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendeActivite extends StatelessWidget {
+  const _LegendeActivite({
+    required this.couleur,
+    required this.texte,
+  });
+
+  final Color couleur;
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: couleur,
+            borderRadius:
+                BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          texte,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _TitreSectionSansCompteur
+    extends StatelessWidget {
+  const _TitreSectionSansCompteur({
+    required this.titre,
+    required this.icone,
+  });
+
+  final String titre;
+  final IconData icone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icone,
+          color: Theme.of(context)
+              .colorScheme
+              .primary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            titre,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -729,9 +1185,9 @@ class _ActivitesRecentesCard
                                 const SizedBox(
                                   width: 8,
                                 ),
-                                _StatutActiviteChip(
-                                  statut:
-                                      activite.statut,
+                                StatutChip(
+                                  statut: activite.statut,
+                                  styles: appelOffreStatutStyles,
                                 ),
                               ],
                             ),
@@ -857,71 +1313,6 @@ class _DetailActivite extends StatelessWidget {
   }
 }
 
-class _StatutActiviteChip
-    extends StatelessWidget {
-  const _StatutActiviteChip({
-    required this.statut,
-  });
-
-  final String statut;
-
-  @override
-  Widget build(BuildContext context) {
-    final statutNormalise =
-        statut.trim().toLowerCase();
-
-    final couleurs =
-        Theme.of(context).colorScheme;
-
-    final Color fond;
-    final Color texte;
-
-    switch (statutNormalise) {
-      case 'publie':
-        fond =
-            couleurs.primaryContainer;
-        texte =
-            couleurs.onPrimaryContainer;
-        break;
-
-      case 'attribue':
-        fond =
-            couleurs.tertiaryContainer;
-        texte =
-            couleurs.onTertiaryContainer;
-        break;
-
-      case 'annule':
-        fond =
-            couleurs.errorContainer;
-        texte =
-            couleurs.onErrorContainer;
-        break;
-
-      default:
-        fond = couleurs
-            .surfaceContainerHighest;
-
-        texte =
-            couleurs.onSurfaceVariant;
-    }
-
-    return Chip(
-      visualDensity:
-          VisualDensity.compact,
-      backgroundColor: fond,
-      side: BorderSide.none,
-      label: Text(
-        _libelleStatut(statut),
-        style: TextStyle(
-          color: texte,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
 class _MessageVide extends StatelessWidget {
   const _MessageVide({
     required this.message,
@@ -1013,14 +1404,8 @@ class _ErreurRapports extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .error,
-            ),
-            const SizedBox(height: 16),
+            CircleIcon.erreur(context),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -1089,6 +1474,77 @@ String _formatDateHeure(
 
   return '$jour/$mois/${dateLocale.year} '
       'à $heure:$minute';
+}
+
+String _formatJours(
+  double? valeur,
+) {
+  if (valeur == null) {
+    return '—';
+  }
+
+  final texte = valeur % 1 == 0
+      ? valeur.toStringAsFixed(0)
+      : valeur.toStringAsFixed(1);
+
+  return '$texte j';
+}
+
+String _formatNombre(
+  double? valeur,
+) {
+  if (valeur == null) {
+    return '—';
+  }
+
+  return valeur % 1 == 0
+      ? valeur.toStringAsFixed(0)
+      : valeur.toStringAsFixed(1);
+}
+
+String _formatPourcent(
+  double? valeur,
+) {
+  if (valeur == null) {
+    return '—';
+  }
+
+  final texte = valeur % 1 == 0
+      ? valeur.toStringAsFixed(0)
+      : valeur.toStringAsFixed(1);
+
+  return '$texte %';
+}
+
+const _libellesMois = [
+  'janv.',
+  'févr.',
+  'mars',
+  'avr.',
+  'mai',
+  'juin',
+  'juil.',
+  'août',
+  'sept.',
+  'oct.',
+  'nov.',
+  'déc.',
+];
+
+String _libelleMois(
+  DateTime date,
+) {
+  final dateLocale = date.toLocal();
+
+  final indexMois =
+      dateLocale.month - 1;
+
+  final libelle = indexMois >= 0 &&
+          indexMois < _libellesMois.length
+      ? _libellesMois[indexMois]
+      : '';
+
+  return '$libelle\n${dateLocale.year}';
 }
 
 String _libelleStatut(
